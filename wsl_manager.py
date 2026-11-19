@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import threading
 import tkinter as tk
+from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -92,10 +93,23 @@ UBUNTU_BASE_URL = ("https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/releas
 UBUNTU_BASE_SHA256 = "e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86"
 
 
-def create_openfoam(name, folder, progress):
+@dataclass(frozen=True)
+class CaeProfile:
+    default_name: str
+    setup_script: str
+
+
+CAE_PROFILES = {
+    "OpenFOAM Foundation 12": CaeProfile("OpenFOAM-12", "openfoam_setup.sh"),
+    "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh"),
+}
+
+
+def create_cae(software, name, folder, progress):
+    profile = CAE_PROFILES[software]
     arch = os.environ.get("PROCESSOR_ARCHITEW6432") or platform.machine()
     if arch.lower() not in ("amd64", "x86_64"):
-        raise ValueError("この OpenFOAM 環境には x64 版 Windows が必要です。")
+        raise ValueError("この CAE 環境には x64 版 Windows が必要です。")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
         raise ValueError("登録名には半角英数字、ピリオド、下線、ハイフンを使用できます。")
     if name.casefold() in {row[0].casefold() for row in inventory()}:
@@ -103,7 +117,7 @@ def create_openfoam(name, folder, progress):
     dest = Path(folder)
     if not dest.is_dir() or any(dest.iterdir()):
         raise ValueError("空の保存先フォルダーを選択してください。")
-    script = Path(__file__).with_name("openfoam_setup.sh").read_text(encoding="utf-8").encode()
+    script = Path(__file__).with_name(profile.setup_script).read_text(encoding="utf-8").encode()
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp, "ubuntu.tar.gz")
         progress("Ubuntu 24.04 をダウンロード中…")
@@ -118,9 +132,10 @@ def create_openfoam(name, folder, progress):
         wsl("--import", name, str(dest.resolve()), str(archive), "--version", "2")
     root = ("-d", name, "-u", "root", "--exec")
     try:
-        progress("OpenFOAM 12 をインストールし、コマンドを検証中…")
-        wsl(*root, "tee", "/root/openfoam_setup.sh", input_data=script)
-        wsl(*root, "bash", "/root/openfoam_setup.sh")
+        progress(f"{software} をセットアップ中…")
+        remote_script = f"/root/{profile.setup_script}"
+        wsl(*root, "tee", remote_script, input_data=script)
+        wsl(*root, "bash", remote_script)
         wsl("--terminate", name)
     except (RuntimeError, OSError) as error:
         raise RuntimeError(f"「{name}」は登録済みです。一覧を更新してください。"
@@ -160,7 +175,10 @@ class Manager:
         self.button(title, "更新", self.refresh, side="right")
         actions = tk.Frame(body, bg="#f1f5f9")
         actions.pack(fill="x", pady=(0, 12))
-        self.button(actions, "OpenFOAM 環境を作成", self.openfoam, primary=True)
+        self.software = tk.StringVar(value=next(iter(CAE_PROFILES)))
+        ttk.Combobox(actions, textvariable=self.software, values=tuple(CAE_PROFILES),
+                     state="readonly", width=25).pack(side="left", padx=(0, 6))
+        self.button(actions, "CAE 環境を作成", self.create_cae_environment, primary=True)
         self.button(actions, "インストール", self.install)
         self.button(actions, "インポート", self.import_distro)
         table = tk.Frame(body)
@@ -303,12 +321,14 @@ class Manager:
         dialog.bind("<Escape>", lambda _: dialog.destroy())
         dialog.grab_set()
 
-    def openfoam(self):
+    def create_cae_environment(self):
+        software = self.software.get()
         def submit(name, folder):
-            self.change("OpenFOAM 環境の作成", lambda: create_openfoam(name, folder, self.progress.put))
-        self.form("OpenFOAM 環境を作成", [("新しい登録名", "OpenFOAM-12", None),
-                                       ("保存先フォルダー（空）", "", "directory")], submit,
-                  "Ubuntu 24.04 と OpenFOAM Foundation 12 をダウンロードして、専用の WSL 2 環境を作成します。")
+            self.change(f"{software} 環境の作成",
+                        lambda: create_cae(software, name, folder, self.progress.put))
+        self.form("CAE 環境を作成", [("新しい登録名", CAE_PROFILES[software].default_name, None),
+                                   ("保存先フォルダー（空）", "", "directory")], submit,
+                  f"Ubuntu 24.04 に {software} を導入した専用の WSL 2 環境を作成します。")
 
     def install(self):
         def submit(name):
