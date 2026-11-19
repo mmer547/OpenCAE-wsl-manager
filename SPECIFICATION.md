@@ -70,3 +70,7 @@ WSL 内に Apptainer を導入し、GUI で指定したユーザーのホーム�
 CalculiX、Gmsh、ParaView は Ubuntu 24.04 のパッケージ、Elmer FEM は Elmer CSC の noble 用 PPA を使用する。Elmer の署名鍵は指紋を照合し、APT ソースに限定する。SU2 は公式の x86-64 OpenMP バイナリ、Code_Saturne は公式タグのソースを使用し、ダウンロード後に SHA-256 を照合する。MBDyn は公式 Git の固定コミットからビルドする。各プロファイルは起動コマンドの存在またはバージョン・ヘルプ応答を確認する。導入先、再開方法、起動例は操作ガイドを参照。
 
 検証では7本それぞれの登録名、転送スクリプト、実行コマンドを模擬 WSL で照合した。Linux 上で SU2 8.6.0 のヘルプ起動と、Ubuntu 配布版 CalculiX CCX 2.21 による四面体の静解析を確認した。全7本の Windows 実機でのインストールと GUI 起動は未検証。
+
+## Netgen
+
+Ubuntu 24.04 の `netgen` と `python3-netgen` を導入する。GUI コマンドの存在を確認し、作成画面で指定した Linux ユーザーで単位立方体の三次元メッシュを生成する。体積要素があることを完了条件とする。メッシュ生成の確認はディスプレイを必要とせず、GUI の起動には WSLg を使用する。

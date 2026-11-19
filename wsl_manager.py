@@ -111,6 +111,7 @@ CAE_PROFILES = {
     "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", sif_source=True),
     "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh"),
     "CalculiX": CaeProfile("CalculiX", "calculix_setup.sh"),
+    "Netgen": CaeProfile("Netgen", "netgen_setup.sh"),
     "Gmsh": CaeProfile("Gmsh", "gmsh_setup.sh"),
     "ParaView": CaeProfile("ParaView", "paraview_setup.sh"),
     "Elmer FEM": CaeProfile("Elmer-FEM", "elmer_setup.sh"),
