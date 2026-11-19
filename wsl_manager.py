@@ -1,5 +1,8 @@
 """Windows Subsystem for Linux のローカル管理画面。"""
+import hashlib
 import os
+import platform
+import urllib.request
 import queue
 import re
 import subprocess
@@ -33,9 +36,10 @@ def decode(data):
     return data.decode(encoding, errors="replace").strip()
 
 
-def wsl(*args):
+def wsl(*args, input_data=None):
     result = subprocess.run([executable(), *args], stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE, input=input_data,
+                            stdin=subprocess.DEVNULL if input_data is None else None,
                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                             env={**os.environ, "WSL_UTF8": "1"})
     if result.returncode:
@@ -83,10 +87,52 @@ def export_archive(name, target):
         partial.rename(target)  # Windows の rename は既存ファイルを置換しない。
 
 
+UBUNTU_BASE_URL = ("https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/"
+                   "ubuntu-base-24.04.5-base-amd64.tar.gz")
+UBUNTU_BASE_SHA256 = "e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86"
+
+
+def create_openfoam(name, folder, progress):
+    arch = os.environ.get("PROCESSOR_ARCHITEW6432") or platform.machine()
+    if arch.lower() not in ("amd64", "x86_64"):
+        raise ValueError("この OpenFOAM 環境には x64 版 Windows が必要です。")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
+        raise ValueError("登録名には半角英数字、ピリオド、下線、ハイフンを使用できます。")
+    if name.casefold() in {row[0].casefold() for row in inventory()}:
+        raise ValueError("同名の環境があります。未使用の登録名を指定してください。")
+    dest = Path(folder)
+    if not dest.is_dir() or any(dest.iterdir()):
+        raise ValueError("空の保存先フォルダーを選択してください。")
+    script = Path(__file__).with_name("openfoam_setup.sh").read_text(encoding="utf-8").encode()
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp, "ubuntu.tar.gz")
+        progress("Ubuntu 24.04 をダウンロード中…")
+        digest = hashlib.sha256()
+        with urllib.request.urlopen(UBUNTU_BASE_URL, timeout=90) as source, archive.open("wb") as output:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                output.write(chunk)
+                digest.update(chunk)
+        if digest.hexdigest() != UBUNTU_BASE_SHA256:
+            raise ValueError("Ubuntu イメージの SHA-256 が一致しません。")
+        progress("WSL 2 に Ubuntu を登録中…")
+        wsl("--import", name, str(dest.resolve()), str(archive), "--version", "2")
+    root = ("-d", name, "-u", "root", "--exec")
+    try:
+        progress("OpenFOAM 12 をインストールし、コマンドを検証中…")
+        wsl(*root, "tee", "/root/openfoam_setup.sh", input_data=script)
+        wsl(*root, "bash", "/root/openfoam_setup.sh")
+        wsl("--terminate", name)
+    except (RuntimeError, OSError) as error:
+        raise RuntimeError(f"「{name}」は登録済みです。一覧を更新してください。"
+                           f"再開手順は README の「途中で失敗した場合」を参照してください。\n{error}") from error
+
+
+
 class Manager:
     def __init__(self, root):
         self.root = root
         self.events = queue.Queue()
+        self.progress = queue.SimpleQueue()
         self.busy = False
         self.rows = []
         root.title("WSL Manager")
@@ -114,7 +160,8 @@ class Manager:
         self.button(title, "更新", self.refresh, side="right")
         actions = tk.Frame(body, bg="#f1f5f9")
         actions.pack(fill="x", pady=(0, 12))
-        self.button(actions, "＋ インストール", self.install, primary=True)
+        self.button(actions, "OpenFOAM 環境を作成", self.openfoam, primary=True)
+        self.button(actions, "インストール", self.install)
         self.button(actions, "インポート", self.import_distro)
         table = tk.Frame(body)
         table.pack(fill="both", expand=True)
@@ -174,6 +221,8 @@ class Manager:
         threading.Thread(target=worker, daemon=True).start()
 
     def poll(self):
+        while not self.progress.empty():
+            self.status.set(self.progress.get())
         try:
             done, value, error = self.events.get_nowait()
         except queue.Empty:
@@ -253,6 +302,13 @@ class Manager:
         dialog.bind("<Return>", accept)
         dialog.bind("<Escape>", lambda _: dialog.destroy())
         dialog.grab_set()
+
+    def openfoam(self):
+        def submit(name, folder):
+            self.change("OpenFOAM 環境の作成", lambda: create_openfoam(name, folder, self.progress.put))
+        self.form("OpenFOAM 環境を作成", [("新しい登録名", "OpenFOAM-12", None),
+                                       ("保存先フォルダー（空）", "", "directory")], submit,
+                  "Ubuntu 24.04 と OpenFOAM Foundation 12 をダウンロードして、専用の WSL 2 環境を作成します。")
 
     def install(self):
         def submit(name):

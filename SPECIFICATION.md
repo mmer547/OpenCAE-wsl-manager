@@ -30,3 +30,11 @@ WSL 操作はワーカースレッドで実行し、同じ画面での処理中�
 ## 検証状況
 
 日本語のコマンド出力のデコードと、模擬コマンドを用いたエクスポート処理（保存、既存ファイルの保護、失敗時の後片付け）を確認済み。Windows 実機での GUI 操作、実際の WSL によるインストール、tar の往復、登録解除は未検証。
+
+## OpenFOAM 専用環境
+
+対象は x64 の WSL 2。入力は未使用の登録名と空の保存先。作成処理は Ubuntu Base 24.04.5 amd64 の tar.gz を一時ディレクトリに取得し、配布元掲載値と SHA-256 が一致した場合に `wsl --import ... --version 2` を実行する。[Ubuntu Base 配布元](https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/)
+
+新規環境内に構築スクリプトを保存し、root で Foundation の署名鍵を取得する。Ubuntu noble 用の APT 配布元に鍵を限定して `openfoam12` を導入する。一般ユーザー `cae` と Bash の読み込み設定を作成し、そのユーザーでバージョン、`blockMesh -help`、`foamRun -help` を検証する。成功後に既定ユーザーを設定して対象を停止する。登録後の失敗では対象を保持する。再実行手順は操作ガイドに記載した。[OpenFOAM Foundation 配布元](https://dl.openfoam.org/ubuntu/)
+
+Windows 上での新規作成からソルバー起動までの通し試験は未実施。
