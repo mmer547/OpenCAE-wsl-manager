@@ -74,3 +74,7 @@ CalculiX、Gmsh、ParaView は Ubuntu 24.04 のパッケージ、Elmer FEM は E
 ## Netgen
 
 Ubuntu 24.04 の `netgen` と `python3-netgen` を導入する。GUI コマンドの存在を確認し、作成画面で指定した Linux ユーザーで単位立方体の三次元メッシュを生成する。体積要素があることを完了条件とする。メッシュ生成の確認はディスプレイを必要とせず、GUI の起動には WSLg を使用する。
+
+## OpenCourant
+
+公式リリース `latest-20261011` の Linux x86-64 ZIP の SHA-256 を照合し、`/opt/opencourant-20261011` に配置する。倍精度 OpenMP 版の Starter と Engine を PATH に登録し、各コマンドの起動時に設定ファイルと共有ライブラリの場所を指定する。GUI で選んだ一般ユーザーで両方の `-version` が成功したら導入完了とする。[公式リリース](https://github.com/OpenCourant/OpenCourant/releases/tag/latest-20261011)

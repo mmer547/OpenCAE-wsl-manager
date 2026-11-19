@@ -36,6 +36,7 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 | OpenLB 1.9r0 | `OpenLB-1.9r0` | `openlb_setup.sh` |
 | Salome-Meca 2025.1 | `Salome-Meca-2025` | `salome_meca_setup.sh` |
 | CalculiX | `CalculiX` | `calculix_setup.sh` |
+| OpenCourant | `OpenCourant` | `opencourant_setup.sh` |
 | Netgen | `Netgen` | `netgen_setup.sh` |
 | Gmsh | `Gmsh` | `gmsh_setup.sh` |
 | ParaView | `ParaView` | `paraview_setup.sh` |
@@ -106,6 +107,7 @@ if ($LASTEXITCODE -eq 0) { wsl --terminate $name }
 | ソフト | 導入内容 | 起動例 |
 | --- | --- | --- |
 | CalculiX | Ubuntu の CCX と CGX | `ccx -i model` |
+| OpenCourant | 公式 Linux x86-64 版（2026-10-11、OpenMP） | `starter_linux64_gf -version`、`engine_linux64_gf -version` |
 | Netgen | Ubuntu のメッシュ生成 GUI と Python バインディング | `netgen` |
 | Gmsh | Ubuntu パッケージ | `gmsh` |
 | ParaView | Ubuntu パッケージ | `paraview` |
