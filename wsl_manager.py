@@ -120,7 +120,36 @@ CAE_PROFILES = {
 }
 
 
-def create_cae(software, name, folder, progress, source=""):
+ACCOUNT_FIELDS = (
+    ("Linux ユーザー名", "cae", None),
+    ("パスワード", "", "password"),
+    ("パスワード（確認）", "", "password"),
+)
+RESERVED_USERS = set("root daemon bin sys sync games man lp mail news uucp proxy www-data "
+                     "backup list irc _apt nobody systemd-network systemd-timesync messagebus syslog".split())
+
+
+def validate_account(user, password, confirmation):
+    if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user) or user in RESERVED_USERS:
+        raise ValueError("予約名以外の Linux ユーザー名を指定してください（小文字英字か下線で始まる32文字以内）。")
+    if not password or any(char in password for char in "\r\n\0"):
+        raise ValueError("空文字・改行・NUL を含むパスワードは使用できません。")
+    if password != confirmation:
+        raise ValueError("確認用パスワードが一致しません。")
+
+
+def create_linux_account(root, user, password):
+    # useradd must succeed before setting a password. Never take over an existing account.
+    wsl(*root, "sh", "-ec",
+        'if command -v useradd >/dev/null; then useradd -m "$1"; '
+        'else adduser -D "$1"; fi', "sh", user)
+    try:
+        wsl(*root, "chpasswd", input_data=f"{user}:{password}\n".encode("utf-8"))
+    except RuntimeError:
+        raise RuntimeError(f"パスワードを設定できませんでした。root で passwd {user} を実行してください。") from None
+
+
+def create_cae(software, name, folder, progress, user, password, source=""):
     profile = CAE_PROFILES[software]
     arch = os.environ.get("PROCESSOR_ARCHITEW6432") or platform.machine()
     if arch.lower() not in ("amd64", "x86_64"):
@@ -154,6 +183,10 @@ def create_cae(software, name, folder, progress, source=""):
         if image is not None:
             linux_path = wsl(*root, "wslpath", "-a", str(image))
             wsl(*root, "tee", "/root/salome-meca-source", input_data=(linux_path + "\n").encode())
+        create_linux_account(root, user, password)
+        wsl(*root, "usermod", "-s", "/bin/bash", user)
+        wsl(*root, "tee", "/root/wsl-manager-user", input_data=(user + "\n").encode())
+        wsl(*root, "tee", "/etc/wsl.conf", input_data=f"[user]\ndefault={user}\n".encode())
         wsl(*root, "bash", remote_script)
         wsl("--terminate", name)
     except (RuntimeError, OSError) as error:
@@ -162,7 +195,7 @@ def create_cae(software, name, folder, progress, source=""):
 
 
 
-def run_openfoam_wizard():
+def run_openfoam_wizard(user, password):
     directory = Path(__file__).resolve().parent / "openfoam-installer"
     for filename in ("install-openfoam-wsl.bat", "install-openfoam-wsl.ps1"):
         if not (directory / filename).is_file():
@@ -176,8 +209,22 @@ def run_openfoam_wizard():
     # path as quoted data with delayed expansion off, not as command text.
     command = ('cmd.exe /d /v:off /s /c "pushd "%WSL_MANAGER_INSTALLER_DIR%" '
                '&& install-openfoam-wsl.bat"')
+    # The interactive installer needs its own console. Protect the hand-off with
+    # current-user Windows DPAPI; its stdin must stay attached to that console.
+    powershell = system / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+    protect = ("$ErrorActionPreference='Stop'; "
+               "[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); "
+               "$s=ConvertTo-SecureString -AsPlainText -Force -String ([Console]::In.ReadToEnd()); "
+               "ConvertFrom-SecureString $s")
+    protected = subprocess.run([str(powershell), "-NoProfile", "-NonInteractive", "-Command", protect],
+                               input=password.encode(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               creationflags=subprocess.CREATE_NO_WINDOW)
+    if protected.returncode or not re.fullmatch(rb"[0-9a-fA-F]+", protected.stdout.strip()):
+        raise RuntimeError("OpenFOAM インストーラー用の認証情報を保護できませんでした。")
     result = subprocess.run(command, executable=str(system / "cmd.exe"),
-                            env={**os.environ, "WSL_MANAGER_INSTALLER_DIR": str(directory)},
+                            env={**os.environ, "WSL_MANAGER_INSTALLER_DIR": str(directory),
+                                 "WSL_MANAGER_USER": user,
+                                 "WSL_MANAGER_DPAPI": protected.stdout.strip().decode("ascii")},
                             creationflags=subprocess.CREATE_NEW_CONSOLE)
     if result.returncode == 0:
         return "OpenFOAM 環境の作成が完了しました"
@@ -335,7 +382,7 @@ class Manager:
                 entry = ttk.Combobox(line, values=kind, textvariable=var, width=44,
                                      state="readonly" if initial in ("1", "2") else "normal")
             else:
-                entry = ttk.Entry(line, textvariable=var, width=46)
+                entry = ttk.Entry(line, textvariable=var, width=46, show="*" if kind == "password" else "")
             entry.pack(side="left", fill="x", expand=True)
             if len(variables) == 1:
                 entry.focus_set()
@@ -355,7 +402,8 @@ class Manager:
                 ttk.Button(line, text="参照", command=browse).pack(side="left", padx=(5, 0))
         def accept(*_):
             try:
-                values = [v.get().strip() for v in variables]
+                values = [v.get() if field[2] == "password" else v.get().strip()
+                          for v, field in zip(variables, fields)]
                 if not all(values):
                     raise ValueError("すべての項目を入力してください。")
                 submit(*values)
@@ -374,26 +422,40 @@ class Manager:
     def create_cae_environment(self):
         software = self.software.get()
         if software == OPENFOAM_WIZARD:
-            self.run("OpenFOAM インストーラーで操作", run_openfoam_wizard, self.refresh)
+            def start_wizard(user, password, confirmation):
+                validate_account(user, password, confirmation)
+                self.run("OpenFOAM インストーラーで操作",
+                         lambda: run_openfoam_wizard(user, password), self.refresh)
+            self.form("OpenFOAM 環境を作成", ACCOUNT_FIELDS, start_wizard,
+                      "作成する Linux ユーザーを指定してください。続く画面で配布元と版を選択します。")
             return
         profile = CAE_PROFILES[software]
-        fields = [("新しい登録名", profile.default_name, None), ("保存先フォルダー（空）", "", "directory")]
+        fields = [("新しい登録名", profile.default_name, None), ("保存先フォルダー（空）", "", "directory"),
+                  *ACCOUNT_FIELDS]
         if profile.sif_source:
             fields.append(("公式 .sif の直接リンク（HTTPS）または取得済みファイル", "", "sif"))
-        def submit(name, folder, source=""):
+        def submit(name, folder, user, password, confirmation, source=""):
+            validate_account(user, password, confirmation)
             self.change(f"{software} 環境の作成",
-                        lambda: create_cae(software, name, folder, self.progress.put, source))
+                        lambda: create_cae(software, name, folder, self.progress.put, user, password, source))
         self.form("CAE 環境を作成", fields, submit,
                   f"Ubuntu 24.04 に {software} を導入した専用の WSL 2 環境を作成します。")
 
     def install(self):
-        def submit(name):
+        def submit(name, user, password, confirmation):
             if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
                 raise ValueError("配布元のディストリビューション名を入力してください。")
-            self.change("インストール", lambda: wsl("--install", "-d", name, "--no-launch"))
+            validate_account(user, password, confirmation)
+            def install_new():
+                if name.casefold() in {row[0].casefold() for row in inventory()}:
+                    raise ValueError("この登録名は既に使用されています。")
+                wsl("--install", "-d", name, "--name", name, "--no-launch")
+                create_linux_account(("-d", name, "-u", "root", "--exec"), user, password)
+                wsl("--manage", name, "--set-default-user", user)
+            self.change("インストール", install_new)
         self.form("インストール", [("ディストリビューション名", "Ubuntu",
-                                  ("Ubuntu", "Debian", "kali-linux", "openSUSE-Tumbleweed"))], submit,
-                  "一覧から選択するか、wsl --list --online に表示される名前を入力してください。")
+                                  ("Ubuntu", "Debian", "kali-linux", "openSUSE-Tumbleweed")), *ACCOUNT_FIELDS], submit,
+                  "新規環境に作成する Linux ユーザーを指定してください。")
 
     def import_distro(self):
         def submit(name, source, folder, version):

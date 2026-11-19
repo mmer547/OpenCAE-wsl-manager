@@ -13,6 +13,3 @@ for tool in SU2_CFD SU2_DEF SU2_DOT SU2_GEO SU2_SOL; do
     ln -sf "/opt/su2-8.6.0/bin/$tool" "/usr/local/bin/$tool"
 done
 SU2_CFD --help >/dev/null
-
-id cae >/dev/null 2>&1 || useradd --create-home --shell /bin/bash cae
-printf '[user]\ndefault=cae\n' > /etc/wsl.conf

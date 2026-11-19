@@ -1,14 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 cd /
+IFS= read -r linux_user < /root/wsl-manager-user
+user_home=$(getent passwd "$linux_user" | cut -d: -f6)
+test -d "$user_home"
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o APT::Update::Error-Mode=any update
 apt-get install -y --no-install-recommends ca-certificates curl build-essential gnuplot-nox imagemagick
-if ! id cae >/dev/null 2>&1; then
-    useradd --create-home --shell /bin/bash cae
-fi
 
-runuser -u cae -- env HOME=/home/cae bash <<'BUILD'
+runuser -u "$linux_user" -- env HOME="$user_home" bash <<'BUILD'
 set -euo pipefail
 cd "$HOME"
 if [[ ! -d olb-1.9r0 ]]; then
@@ -24,4 +24,3 @@ make
 make -C examples/laminar/poiseuille2d
 test -x examples/laminar/poiseuille2d/poiseuille2d
 BUILD
-printf '[user]\ndefault=cae\n' > /etc/wsl.conf

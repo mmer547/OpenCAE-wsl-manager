@@ -263,7 +263,18 @@ function Select-OpenFoamConfiguration {
 }
 
 try {
-    $credentials = Select-LinuxCredentials
+    if ($env:WSL_MANAGER_DPAPI) {
+        $secure = ConvertTo-SecureString -String $env:WSL_MANAGER_DPAPI
+        $credentials = @{ UserName = $env:WSL_MANAGER_USER; Password = (ConvertFrom-SecureValue $secure)
+                          PasswordDisplay = '（GUIで入力済み）'; ModeLabel = 'GUI設定' }
+        Remove-Item Env:WSL_MANAGER_DPAPI
+        Remove-Item Env:WSL_MANAGER_USER
+        $secure.Dispose()
+        if ($credentials.UserName -cnotmatch '^[a-z_][a-z0-9_-]{0,31}$' -or
+            $credentials.UserName -in $ReservedLinuxUserNames) { throw 'Linuxユーザー名が無効です。' }
+    } else {
+        $credentials = Select-LinuxCredentials
+    }
     $configuration = Select-OpenFoamConfiguration
     $BaseName = $configuration.BaseName
     $OpenFoamPackage = $configuration.Package

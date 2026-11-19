@@ -16,6 +16,3 @@ make -j2
 make install
 ldconfig
 mbdyn --version
-
-id cae >/dev/null 2>&1 || useradd --create-home --shell /bin/bash cae
-printf '[user]\ndefault=cae\n' > /etc/wsl.conf

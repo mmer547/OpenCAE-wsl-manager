@@ -16,6 +16,3 @@ apt-get -o APT::Update::Error-Mode=any update
 apt-get install -y elmerfem-csc
 command -v ElmerSolver >/dev/null
 command -v ElmerGrid >/dev/null
-
-id cae >/dev/null 2>&1 || useradd --create-home --shell /bin/bash cae
-printf '[user]\ndefault=cae\n' > /etc/wsl.conf

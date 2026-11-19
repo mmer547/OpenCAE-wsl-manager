@@ -18,6 +18,3 @@ make -j2
 make install
 ldconfig
 code_saturne info --version
-
-id cae >/dev/null 2>&1 || useradd --create-home --shell /bin/bash cae
-printf '[user]\ndefault=cae\n' > /etc/wsl.conf
