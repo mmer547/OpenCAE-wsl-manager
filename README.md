@@ -34,6 +34,20 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 | --- | --- | --- |
 | OpenFOAM Foundation 12 | `OpenFOAM-12` | `openfoam_setup.sh` |
 | OpenLB 1.9r0 | `OpenLB-1.9r0` | `openlb_setup.sh` |
+| Salome-Meca 2025.1 | `Salome-Meca-2025` | `salome_meca_setup.sh` |
+
+### Salome-Meca の取得と起動
+
+ダイアログの **公式配布ページ** を開き、2025 版の Linux 用 Singularity イメージ（約 5.34 GB）を選びます。配布元から取得した SIF ファイルの HTTPS 直接リンクを貼り付けるか、**参照** で取得済みの `.sif` を選択します。Windows 上のキャッシュと WSL 内のコピーに、それぞれイメージ 1 個分の空き容量が必要です。[公式配布ページ](https://open-simulation-center.org/en/downloads/code_aster/SALOME_MECA/2025)
+
+通信が切れた場合は最大 5 回自動で再接続します。取得が止まったら、同じソフトを選んで **CAE 環境を作成** をもう一度実行してください。リンクの期限が切れた場合は新しい直接リンクを指定します。配布元が範囲取得に対応していれば保存済みの位置から再開します。取得状況は MiB 単位で画面下部に表示されます。
+
+ダウンロードが完了してから WSL を登録します。完了したイメージも Windows の `%LOCALAPPDATA%\WSL-Manager\Salome-Meca` に保持されます。構築後は WSLg 対応の Windows でその環境の **ターミナル** を開き、次を実行します。
+
+```bash
+cd ~
+salome-meca --soft
+```
 
 ### OpenLB のサンプルを実行する
 

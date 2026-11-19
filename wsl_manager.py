@@ -3,6 +3,9 @@ import hashlib
 import os
 import platform
 import urllib.request
+import webbrowser
+
+import salome_image
 import queue
 import re
 import subprocess
@@ -97,15 +100,17 @@ UBUNTU_BASE_SHA256 = "e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f5614
 class CaeProfile:
     default_name: str
     setup_script: str
+    sif_source: bool = False
 
 
 CAE_PROFILES = {
     "OpenFOAM Foundation 12": CaeProfile("OpenFOAM-12", "openfoam_setup.sh"),
+    "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", sif_source=True),
     "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh"),
 }
 
 
-def create_cae(software, name, folder, progress):
+def create_cae(software, name, folder, progress, source=""):
     profile = CAE_PROFILES[software]
     arch = os.environ.get("PROCESSOR_ARCHITEW6432") or platform.machine()
     if arch.lower() not in ("amd64", "x86_64"):
@@ -118,6 +123,7 @@ def create_cae(software, name, folder, progress):
     if not dest.is_dir() or any(dest.iterdir()):
         raise ValueError("空の保存先フォルダーを選択してください。")
     script = Path(__file__).with_name(profile.setup_script).read_text(encoding="utf-8").encode()
+    image = salome_image.prepare_image(source, progress) if profile.sif_source else None
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp, "ubuntu.tar.gz")
         progress("Ubuntu 24.04 をダウンロード中…")
@@ -135,6 +141,9 @@ def create_cae(software, name, folder, progress):
         progress(f"{software} をセットアップ中…")
         remote_script = f"/root/{profile.setup_script}"
         wsl(*root, "tee", remote_script, input_data=script)
+        if image is not None:
+            linux_path = wsl(*root, "wslpath", "-a", str(image))
+            wsl(*root, "tee", "/root/salome-meca-source", input_data=(linux_path + "\n").encode())
         wsl(*root, "bash", remote_script)
         wsl("--terminate", name)
     except (RuntimeError, OSError) as error:
@@ -296,6 +305,13 @@ class Manager:
             entry.pack(side="left", fill="x", expand=True)
             if len(variables) == 1:
                 entry.focus_set()
+            if kind == "sif":
+                def pick_sif(v=var):
+                    path = filedialog.askopenfilename(parent=dialog, filetypes=[("Salome-Meca SIF", "*.sif")])
+                    if path:
+                        v.set(path)
+                ttk.Button(line, text="参照", command=pick_sif).pack(side="left")
+                ttk.Button(line, text="公式配布ページ", command=lambda: webbrowser.open(salome_image.RELEASE_PAGE)).pack(side="left")
             if kind in ("file", "directory"):
                 def browse(v=var, k=kind):
                     path = (filedialog.askopenfilename(parent=dialog, filetypes=[("tar アーカイブ", "*.tar"), ("すべて", "*")])
@@ -323,11 +339,14 @@ class Manager:
 
     def create_cae_environment(self):
         software = self.software.get()
-        def submit(name, folder):
+        profile = CAE_PROFILES[software]
+        fields = [("新しい登録名", profile.default_name, None), ("保存先フォルダー（空）", "", "directory")]
+        if profile.sif_source:
+            fields.append(("公式 .sif の直接リンク（HTTPS）または取得済みファイル", "", "sif"))
+        def submit(name, folder, source=""):
             self.change(f"{software} 環境の作成",
-                        lambda: create_cae(software, name, folder, self.progress.put))
-        self.form("CAE 環境を作成", [("新しい登録名", CAE_PROFILES[software].default_name, None),
-                                   ("保存先フォルダー（空）", "", "directory")], submit,
+                        lambda: create_cae(software, name, folder, self.progress.put, source))
+        self.form("CAE 環境を作成", fields, submit,
                   f"Ubuntu 24.04 に {software} を導入した専用の WSL 2 環境を作成します。")
 
     def install(self):
