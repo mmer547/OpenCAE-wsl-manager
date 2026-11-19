@@ -103,6 +103,9 @@ class CaeProfile:
     sif_source: bool = False
 
 
+OPENFOAM_WIZARD = "OpenFOAM（配布元・版を選択）"
+
+
 CAE_PROFILES = {
     "OpenFOAM Foundation 12": CaeProfile("OpenFOAM-12", "openfoam_setup.sh"),
     "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", sif_source=True),
@@ -152,6 +155,30 @@ def create_cae(software, name, folder, progress, source=""):
 
 
 
+def run_openfoam_wizard():
+    directory = Path(__file__).resolve().parent / "openfoam-installer"
+    for filename in ("install-openfoam-wsl.bat", "install-openfoam-wsl.ps1"):
+        if not (directory / filename).is_file():
+            raise FileNotFoundError(f"同梱ファイルが見つかりません: {directory / filename}")
+    # Use native Windows tools even when Python is a 32-bit process.
+    windows = Path(os.environ["SystemRoot"])
+    system = windows / "Sysnative"
+    if not (system / "cmd.exe").is_file():
+        system = windows / "System32"
+    # pushd also supports a distribution extracted to a UNC share. Expand its
+    # path as quoted data with delayed expansion off, not as command text.
+    command = ('cmd.exe /d /v:off /s /c "pushd "%WSL_MANAGER_INSTALLER_DIR%" '
+               '&& install-openfoam-wsl.bat"')
+    result = subprocess.run(command, executable=str(system / "cmd.exe"),
+                            env={**os.environ, "WSL_MANAGER_INSTALLER_DIR": str(directory)},
+                            creationflags=subprocess.CREATE_NEW_CONSOLE)
+    if result.returncode == 0:
+        return "OpenFOAM 環境の作成が完了しました"
+    if result.returncode == 2:
+        return "OpenFOAM 環境の作成をキャンセルしました"
+    return f"OpenFOAM のインストーラーが終了しました（終了コード {result.returncode}）。作成途中の環境を確認してください"
+
+
 class Manager:
     def __init__(self, root):
         self.root = root
@@ -185,7 +212,7 @@ class Manager:
         actions = tk.Frame(body, bg="#f1f5f9")
         actions.pack(fill="x", pady=(0, 12))
         self.software = tk.StringVar(value=next(iter(CAE_PROFILES)))
-        ttk.Combobox(actions, textvariable=self.software, values=tuple(CAE_PROFILES),
+        ttk.Combobox(actions, textvariable=self.software, values=(OPENFOAM_WIZARD, *CAE_PROFILES),
                      state="readonly", width=25).pack(side="left", padx=(0, 6))
         self.button(actions, "CAE 環境を作成", self.create_cae_environment, primary=True)
         self.button(actions, "インストール", self.install)
@@ -339,6 +366,9 @@ class Manager:
 
     def create_cae_environment(self):
         software = self.software.get()
+        if software == OPENFOAM_WIZARD:
+            self.run("OpenFOAM インストーラーで操作", run_openfoam_wizard, self.refresh)
+            return
         profile = CAE_PROFILES[software]
         fields = [("新しい登録名", profile.default_name, None), ("保存先フォルダー（空）", "", "directory")]
         if profile.sif_source:
