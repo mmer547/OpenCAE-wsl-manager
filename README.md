@@ -35,6 +35,13 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 | OpenFOAM Foundation 12 | `OpenFOAM-12` | `openfoam_setup.sh` |
 | OpenLB 1.9r0 | `OpenLB-1.9r0` | `openlb_setup.sh` |
 | Salome-Meca 2025.1 | `Salome-Meca-2025` | `salome_meca_setup.sh` |
+| CalculiX | `CalculiX` | `calculix_setup.sh` |
+| Gmsh | `Gmsh` | `gmsh_setup.sh` |
+| ParaView | `ParaView` | `paraview_setup.sh` |
+| Elmer FEM | `Elmer-FEM` | `elmer_setup.sh` |
+| SU2 | `SU2` | `su2_setup.sh` |
+| Code_Saturne | `Code-Saturne` | `code_saturne_setup.sh` |
+| MBDyn | `MBDyn` | `mbdyn_setup.sh` |
 
 ### OpenFOAM の配布元・バージョンを選ぶ
 
@@ -90,3 +97,19 @@ if ($LASTEXITCODE -eq 0) { wsl --terminate $name }
 ```
 
 スクリプトの転送自体が失敗した場合は、アプリのフォルダーで `cmd /c "wsl -d $name -u root --exec tee /root/$script < $script > nul"` を実行してから再開します。
+
+## 追加の CAE ソフトを使う
+
+一覧から対象を選んで **CAE 環境を作成** を押します。作成後はその環境の **ターミナル** を開きます。以下の入力ファイル名は自分の解析ケースに読み替えてください。GUI の表示には WSLg が必要です。
+
+| ソフト | 導入内容 | 起動例 |
+| --- | --- | --- |
+| CalculiX | Ubuntu の CCX と CGX | `ccx -i model` |
+| Gmsh | Ubuntu パッケージ | `gmsh` |
+| ParaView | Ubuntu パッケージ | `paraview` |
+| Elmer FEM | Elmer CSC の Ubuntu 24.04 用 PPA | `ElmerSolver case.sif` |
+| SU2 | 公式 8.6.0 OpenMP 版 | `SU2_CFD case.cfg` |
+| Code_Saturne | 公式 9.0.2 ソース、Qt5 GUI | `code_saturne gui` |
+| MBDyn | 公式 Git ソース（767fd42e） | `mbdyn -f model.mbd` |
+
+Code_Saturne と MBDyn は WSL 内でコンパイルするため、初回の環境作成に時間がかかります。長いビルドの途中でエラーが出た場合も、上記の「途中で失敗した場合」の手順で再実行できます。

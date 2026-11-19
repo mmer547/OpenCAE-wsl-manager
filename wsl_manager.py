@@ -110,6 +110,13 @@ CAE_PROFILES = {
     "OpenFOAM Foundation 12": CaeProfile("OpenFOAM-12", "openfoam_setup.sh"),
     "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", sif_source=True),
     "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh"),
+    "CalculiX": CaeProfile("CalculiX", "calculix_setup.sh"),
+    "Gmsh": CaeProfile("Gmsh", "gmsh_setup.sh"),
+    "ParaView": CaeProfile("ParaView", "paraview_setup.sh"),
+    "Elmer FEM": CaeProfile("Elmer-FEM", "elmer_setup.sh"),
+    "SU2": CaeProfile("SU2", "su2_setup.sh"),
+    "Code_Saturne": CaeProfile("Code-Saturne", "code_saturne_setup.sh"),
+    "MBDyn": CaeProfile("MBDyn", "mbdyn_setup.sh"),
 }
 
 
