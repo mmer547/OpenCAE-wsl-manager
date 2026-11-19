@@ -167,7 +167,8 @@ def create_cae(software, name, folder, progress, user, password, source=""):
     dest = Path(folder)
     if not dest.is_dir() or any(dest.iterdir()):
         raise ValueError("空の保存先フォルダーを選択してください。")
-    scripts = {name: Path(__file__).with_name(name).read_text(encoding="utf-8").encode()
+    script_dir = Path(__file__).resolve().parent / "scripts" / "cae"
+    scripts = {name: (script_dir / name).read_text(encoding="utf-8").encode()
                for name in (*profile.supporting_scripts, profile.setup_script)}
     image = salome_image.prepare_image(source, progress) if profile.sif_source else None
     with tempfile.TemporaryDirectory() as tmp:

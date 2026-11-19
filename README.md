@@ -24,7 +24,7 @@ WSL 自体を初めて有効にするときは、管理者の PowerShell で `ws
 
 ## CAE 環境の作成
 
-x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量が必要です。配布物を同じフォルダーに展開してください。
+x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量が必要です。ZIP はフォルダー構成を保ったまま展開してください。各ソフトのセットアップスクリプトは `scripts/cae/` にあります。
 
 1. 一覧の上にあるプルダウンでソフトを一つ選び、**CAE 環境を作成** を押します。
 2. 作成画面で Linux ユーザー名（初期値 `cae`）、パスワード、確認用パスワードを入力します。**OpenFOAM（配布元・版を選択）** 以外は、同じ画面で新しい登録名と空の保存先フォルダーも指定します。
@@ -101,7 +101,7 @@ wsl -d $name -u root --exec bash "/root/$script"
 if ($LASTEXITCODE -eq 0) { wsl --terminate $name }
 ```
 
-スクリプトの転送自体が失敗した場合は、アプリのフォルダーで `cmd /c "wsl -d $name -u root --exec tee /root/$script < $script > nul"` を実行してから再開します。
+スクリプトの転送自体が失敗した場合は、アプリのフォルダーで `cmd /c "wsl -d $name -u root --exec tee /root/$script < scripts\cae\$script > nul"` を実行してから再開します。
 
 ## 追加の CAE ソフトを使う
 
