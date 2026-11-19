@@ -78,3 +78,13 @@ Ubuntu 24.04 の `netgen` と `python3-netgen` を導入する。GUI コマン�
 ## OpenCourant
 
 公式リリース `latest-20261011` の Linux x86-64 ZIP の SHA-256 を照合し、`/opt/opencourant-20261011` に配置する。倍精度 OpenMP 版の Starter と Engine を PATH に登録し、各コマンドの起動時に設定ファイルと共有ライブラリの場所を指定する。GUI で選んだ一般ユーザーで両方の `-version` が成功したら導入完了とする。[公式リリース](https://github.com/OpenCourant/OpenCourant/releases/tag/latest-20261011)
+
+## OpenModelica、FreeCAD、TreeFOAM
+
+| 選択項目 | 配布元と導入内容 | セットアップ完了の確認 |
+| --- | --- | --- |
+| OpenModelica | Ubuntu 24.04 用の公式 stable リポジトリから omc、omedit、omlibrary を導入。署名鍵をこのリポジトリに限定する。[公式配布元](https://build.openmodelica.org/apt/) | コンパイラのバージョンと OMEdit コマンド |
+| FreeCAD | Ubuntu 24.04 用のメンテナーの stable PPA から導入。鍵の指紋を照合する。[配布元](https://launchpad.net/~freecad-maintainers/+archive/ubuntu/freecad-stable) | freecad コマンドと freecad-python3 パッケージ |
+| TreeFOAM | TreeFoam 3.38 の公式 ZIP の SHA-256 を照合し、本体とマニュアルを導入。共通スクリプトで OpenFOAM Foundation 12 を設定し、ParaView と日本語フォントも導入する。[公式配布元](https://opencae-dalab.org/pukiwiki/?SoftTreeFoam) | OpenFOAM のツール、TreeFoam と ParaView の起動コマンド、一般ユーザーでの GTK・Qt・VTK の読み込み |
+
+TreeFOAM の初期設定は一般ユーザーのホームに作成する。再開時は作成済みのユーザー設定を保持する。GUI 表示には WSLg が必要。

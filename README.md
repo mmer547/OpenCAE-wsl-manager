@@ -37,6 +37,9 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 | Salome-Meca 2025.1 | `Salome-Meca-2025` | `salome_meca_setup.sh` |
 | CalculiX | `CalculiX` | `calculix_setup.sh` |
 | OpenCourant | `OpenCourant` | `opencourant_setup.sh` |
+| OpenModelica | `OpenModelica` | `openmodelica_setup.sh` |
+| FreeCAD | `FreeCAD` | `freecad_setup.sh` |
+| TreeFOAM | `TreeFOAM` | `treefoam_setup.sh` |
 | Netgen | `Netgen` | `netgen_setup.sh` |
 | Gmsh | `Gmsh` | `gmsh_setup.sh` |
 | ParaView | `ParaView` | `paraview_setup.sh` |
@@ -108,6 +111,9 @@ if ($LASTEXITCODE -eq 0) { wsl --terminate $name }
 | --- | --- | --- |
 | CalculiX | Ubuntu の CCX と CGX | `ccx -i model` |
 | OpenCourant | 公式 Linux x86-64 版（2026-10-11、OpenMP） | `starter_linux64_gf -version`、`engine_linux64_gf -version` |
+| OpenModelica | 公式 stable 版のコンパイラ、OMEdit、標準ライブラリ | `OMEdit` または `omc --version` |
+| FreeCAD | FreeCAD メンテナーの stable PPA 版 | `freecad` |
+| TreeFOAM | TreeFoam 3.38 日本語版、OpenFOAM Foundation 12、ParaView | `treefoam` |
 | Netgen | Ubuntu のメッシュ生成 GUI と Python バインディング | `netgen` |
 | Gmsh | Ubuntu パッケージ | `gmsh` |
 | ParaView | Ubuntu パッケージ | `paraview` |
@@ -117,3 +123,5 @@ if ($LASTEXITCODE -eq 0) { wsl --terminate $name }
 | MBDyn | 公式 Git ソース（767fd42e） | `mbdyn -f model.mbd` |
 
 Code_Saturne と MBDyn は WSL 内でコンパイルするため、初回の環境作成に時間がかかります。長いビルドの途中でエラーが出た場合も、上記の「途中で失敗した場合」の手順で再実行できます。
+
+TreeFOAM のケース用フォルダーは `~/OpenFOAM/run` です。PyFoam を使うログ監視と DEXCS 拡張はこの構成の対象外です。TreeFOAM の再開時には、同じ環境の `/root/openfoam_setup.sh` も使用します。

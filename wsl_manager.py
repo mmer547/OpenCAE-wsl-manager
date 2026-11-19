@@ -101,6 +101,7 @@ class CaeProfile:
     default_name: str
     setup_script: str
     sif_source: bool = False
+    supporting_scripts: tuple = ()
 
 
 OPENFOAM_WIZARD = "OpenFOAM（配布元・版を選択）"
@@ -112,6 +113,9 @@ CAE_PROFILES = {
     "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh"),
     "CalculiX": CaeProfile("CalculiX", "calculix_setup.sh"),
     "OpenCourant": CaeProfile("OpenCourant", "opencourant_setup.sh"),
+    "OpenModelica": CaeProfile("OpenModelica", "openmodelica_setup.sh"),
+    "FreeCAD": CaeProfile("FreeCAD", "freecad_setup.sh"),
+    "TreeFOAM": CaeProfile("TreeFOAM", "treefoam_setup.sh", supporting_scripts=("openfoam_setup.sh",)),
     "Netgen": CaeProfile("Netgen", "netgen_setup.sh"),
     "Gmsh": CaeProfile("Gmsh", "gmsh_setup.sh"),
     "ParaView": CaeProfile("ParaView", "paraview_setup.sh"),
@@ -163,7 +167,8 @@ def create_cae(software, name, folder, progress, user, password, source=""):
     dest = Path(folder)
     if not dest.is_dir() or any(dest.iterdir()):
         raise ValueError("空の保存先フォルダーを選択してください。")
-    script = Path(__file__).with_name(profile.setup_script).read_text(encoding="utf-8").encode()
+    scripts = {name: Path(__file__).with_name(name).read_text(encoding="utf-8").encode()
+               for name in (*profile.supporting_scripts, profile.setup_script)}
     image = salome_image.prepare_image(source, progress) if profile.sif_source else None
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp, "ubuntu.tar.gz")
@@ -181,7 +186,8 @@ def create_cae(software, name, folder, progress, user, password, source=""):
     try:
         progress(f"{software} をセットアップ中…")
         remote_script = f"/root/{profile.setup_script}"
-        wsl(*root, "tee", remote_script, input_data=script)
+        for filename, content in scripts.items():
+            wsl(*root, "tee", f"/root/{filename}", input_data=content)
         if image is not None:
             linux_path = wsl(*root, "wslpath", "-a", str(image))
             wsl(*root, "tee", "/root/salome-meca-source", input_data=(linux_path + "\n").encode())
