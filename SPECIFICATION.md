@@ -35,7 +35,7 @@ WSL 操作はワーカースレッドで実行し、同じ画面での処理中�
 
 対象は x64 の WSL 2。入力は未使用の登録名、空の保存先、Linux ユーザー名、パスワードとその確認。作成処理は Ubuntu Base 24.04.5 amd64 の tar.gz を一時ディレクトリに取得し、配布元掲載値と SHA-256 が一致した場合に `wsl --import ... --version 2` を実行する。[Ubuntu Base 配布元](https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/)
 
-新規環境内に構築スクリプトを保存し、root で Foundation の署名鍵を取得する。Ubuntu noble 用の APT 配布元に鍵を限定して `openfoam12` を導入する。GUI で指定したユーザーの Bash 読み込み設定を作成し、そのユーザーでバージョン、`blockMesh -help`、`foamRun -help` を検証する。構築前に既定ユーザーを設定し、成功後に対象を停止する。登録後の失敗では対象を保持する。再実行手順は操作ガイドに記載した。[OpenFOAM Foundation 配布元](https://dl.openfoam.org/ubuntu/)
+Foundation と Keysight の最新版を別々のチェック項目として提供する。各配布元の署名を検証した Ubuntu noble の amd64 パッケージ一覧から正式版の最大番号を求め、Foundation は openfoam〈番号〉、Keysight は openfoam〈年月〉-default を導入する。選択したユーザーで版番号と blockMesh を確認する。TreeFOAM 用の Foundation 12 は固定する。
 
 Windows 上での新規作成からソルバー起動までの通し試験は未実施。
 

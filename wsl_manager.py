@@ -102,13 +102,17 @@ class CaeProfile:
     setup_script: str
     sif_source: bool = False
     supporting_scripts: tuple = ()
+    resources: tuple = ()
 
 
 OPENFOAM_WIZARD = "OpenFOAM（配布元・版を選択）"
 
 
 CAE_PROFILES = {
-    "OpenFOAM Foundation 12": CaeProfile("OpenFOAM-12", "openfoam_setup.sh"),
+    "OpenFOAM Foundation（最新版）": CaeProfile("OpenFOAM-Foundation", "openfoam_foundation_setup.sh",
+                                            resources=("openfoam_latest.sh",)),
+    "OpenFOAM Keysight（最新版）": CaeProfile("OpenFOAM-Keysight", "openfoam_keysight_setup.sh",
+                                         resources=("openfoam_latest.sh",)),
     "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", sif_source=True),
     "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh"),
     "CalculiX": CaeProfile("CalculiX", "calculix_setup.sh"),
@@ -190,8 +194,9 @@ def create_cae(selected, name, folder, progress, user, password, source=""):
     for profile in profiles:
         for filename in (*profile.supporting_scripts, profile.setup_script):
             steps.setdefault(filename, profile.default_name)
+    resources = {filename for profile in profiles for filename in profile.resources}
     scripts = {filename: (script_dir / filename).read_text(encoding="utf-8").encode()
-               for filename in (*steps, "resume.sh")}
+               for filename in (*steps, *resources, "resume.sh")}
     image = salome_image.prepare_image(source, progress) if any(p.sif_source for p in profiles) else None
     if wizard:
         progress("OpenFOAM の配布元と版をコンソールで選択してください")

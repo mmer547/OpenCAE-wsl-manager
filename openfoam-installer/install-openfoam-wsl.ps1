@@ -391,9 +391,9 @@ apt-get update
         Invoke-Wsl $distributionName @'
 set -e
 add-apt-repository -y universe
-wget -qO /tmp/openfoam-add-debian-repo.sh https://dl.openfoam.com/add-debian-repo.sh
-bash /tmp/openfoam-add-debian-repo.sh
-rm -f /tmp/openfoam-add-debian-repo.sh
+install -d -m 0755 /etc/apt/keyrings
+wget -qO /etc/apt/keyrings/openfoam-keysight.asc https://dl.openfoam.com/pubkey.gpg
+echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/openfoam-keysight.asc] https://dl.openfoam.com/repos/deb noble main' > /etc/apt/sources.list.d/openfoam-keysight.list
 apt-get update
 '@
     }

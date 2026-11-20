@@ -32,7 +32,8 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 
 | ソフト | 標準の登録名 | 再開に使うスクリプト |
 | --- | --- | --- |
-| OpenFOAM Foundation 12 | `OpenFOAM-12` | `openfoam_setup.sh` |
+| OpenFOAM Foundation（最新版） | `OpenFOAM-Foundation` | `openfoam_foundation_setup.sh` |
+| OpenFOAM Keysight（最新版） | `OpenFOAM-Keysight` | `openfoam_keysight_setup.sh` |
 | OpenLB 1.9r0 | `OpenLB-1.9r0` | `openlb_setup.sh` |
 | Salome-Meca 2025.1 | `Salome-Meca-2025` | `salome_meca_setup.sh` |
 | CalculiX | `CalculiX` | `calculix_setup.sh` |
@@ -57,7 +58,7 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 3. 続行すると Ubuntu 24.04 LTS の WSL 2 を作成します。登録名が重複すると `-2`、`-3` と自動採番されます。設定したユーザーで sudo を使えます。
 4. OpenFOAM の検証が完了すると、マネージャーが同じ登録名の環境に残りのソフトを自動で導入します。
 
-保存場所は WSL が管理します。Foundation 12 で保存先と登録名を自分で指定する場合は、従来の **OpenFOAM Foundation 12** を選べます。[対話インストーラーの詳細](openfoam-installer/README.md)
+保存場所は WSL が管理します。自動で最新版を入れるには、メイン画面の **OpenFOAM Foundation（最新版）** または **OpenFOAM Keysight（最新版）** にチェックを入れます。両方を選ぶと同じ環境に導入し、通常のターミナルでは先に設定した版を読み込みます。[対話インストーラーの詳細](openfoam-installer/README.md)
 
 ### Salome-Meca の取得と起動
 
@@ -85,10 +86,10 @@ cd ~/olb-1.9r0/examples/laminar/poiseuille2d
 
 ```bash
 echo "$WM_PROJECT_VERSION"
-foamRun -help
+blockMesh -help
 ```
 
-バージョン表示の期待値は `12` です。
+両方を導入した場合、Keysight 版の設定ファイルは `/usr/lib/openfoam/openfoam<版番号>/etc/bashrc`、Foundation 版は `/opt/openfoam<版番号>/etc/bashrc` です。
 
 ### 途中で失敗した場合
 
