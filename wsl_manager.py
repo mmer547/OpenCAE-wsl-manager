@@ -148,14 +148,17 @@ def validate_account(user, password, confirmation):
         raise ValueError("確認用パスワードが一致しません。")
 
 
-def create_linux_account(root, user, password):
+def create_linux_account(root, user, password, *, ubuntu_base=False):
     # useradd must succeed before setting a password. Never take over an existing account.
     wsl(*root, "sh", "-ec",
         'if command -v useradd >/dev/null; then useradd -m "$1"; '
         'else adduser -D "$1"; fi', "sh", user)
     try:
-        wsl(*root, "chpasswd", input_data=f"{user}:{password}\n".encode("utf-8"))
+        command = ("/usr/sbin/chpasswd", "--crypt-method", "YESCRYPT") if ubuntu_base else ("chpasswd",)
+        wsl(*root, *command, input_data=f"{user}:{password}\n".encode("utf-8"))
     except RuntimeError:
+        if ubuntu_base:
+            raise RuntimeError(f"パスワードを設定できませんでした。PowerShell で py -3 repair_cae.py {root[1]} {user} を実行してください。") from None
         raise RuntimeError(f"パスワードを設定できませんでした。root で passwd {user} を実行してください。") from None
 
 
@@ -229,7 +232,7 @@ def create_cae(selected, name, folder, progress, user, password, source=""):
             linux_path = wsl(*root, "wslpath", "-a", str(image))
             wsl(*root, "tee", "/root/salome-meca-source", input_data=(linux_path + "\n").encode())
         if not wizard:
-            create_linux_account(root, user, password)
+            create_linux_account(root, user, password, ubuntu_base=True)
             wsl(*root, "usermod", "-s", "/bin/bash", user)
             wsl(*root, "tee", "/etc/wsl.conf", input_data=f"[user]\ndefault={user}\n".encode())
         wsl(*root, "tee", "/root/wsl-manager-user", input_data=(user + "\n").encode())
