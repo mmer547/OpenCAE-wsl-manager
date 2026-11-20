@@ -538,12 +538,28 @@ class Manager:
         if self.busy or not name:
             return
 
-        def submit(confirmation):
-            if confirmation != name:
-                raise ValueError("入力した名前が一致しません。")
+        dialog = tk.Toplevel(self.root)
+        dialog.title("WSL の削除")
+        dialog.transient(self.root)
+        panel = ttk.Frame(dialog, padding=18)
+        panel.pack()
+        ttk.Label(panel, text=f"「{name}」を削除しますか？", wraplength=420).pack(anchor="w")
+        ttk.Label(panel, text="この環境の全データが削除されます。この操作は取り消せません。").pack(pady=(4, 16))
+        actions = ttk.Frame(panel)
+        actions.pack(anchor="e")
+
+        def confirm():
+            dialog.destroy()
             self.change(f"「{name}」の削除", lambda: wsl("--unregister", name))
-        self.form("削除", [("確認用のディストリビューション名", "", None)], submit,
-                  f"「{name}」の登録と内部の全データを削除します。この操作は取り消せません。")
+
+        cancel = ttk.Button(actions, text="キャンセル", command=dialog.destroy)
+        cancel.pack(side="left", padx=6)
+        ttk.Button(actions, text="削除する", command=confirm).pack(side="left")
+        dialog.bind("<Escape>", lambda _: dialog.destroy())
+        dialog.bind("<Return>", lambda _: dialog.destroy())
+        dialog.wait_visibility()
+        dialog.grab_set()
+        cancel.focus_set()
 
     def launch_row(self, event):
         row = self.tree.identify_row(event.y)
