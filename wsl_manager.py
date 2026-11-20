@@ -159,6 +159,21 @@ def create_linux_account(root, user, password):
         raise RuntimeError(f"パスワードを設定できませんでした。root で passwd {user} を実行してください。") from None
 
 
+def validate_install_folder(folder):
+    if folder:
+        dest = Path(folder)
+        if not dest.is_dir() or any(dest.iterdir()):
+            raise ValueError("保存先を指定する場合は空のフォルダーを選択してください。")
+
+
+def register_archive(name, source, folder, version):
+    validate_install_folder(folder)
+    if folder:
+        wsl("--import", name, str(Path(folder).resolve()), str(source), "--version", version)
+    else:
+        wsl("--install", "--from-file", str(source), "--name", name, "--version", version, "--no-launch")
+
+
 def import_cae_base(name, folder, progress):
     arch = os.environ.get("PROCESSOR_ARCHITEW6432") or platform.machine()
     if arch.lower() not in ("amd64", "x86_64"):
@@ -167,9 +182,7 @@ def import_cae_base(name, folder, progress):
         raise ValueError("登録名には半角英数字、ピリオド、下線、ハイフンを使用できます。")
     if name.casefold() in {row[0].casefold() for row in inventory()}:
         raise ValueError("同名の環境があります。未使用の登録名を指定してください。")
-    dest = Path(folder)
-    if not dest.is_dir() or any(dest.iterdir()):
-        raise ValueError("空の保存先フォルダーを選択してください。")
+    validate_install_folder(folder)
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp, "ubuntu.tar.gz")
         progress("Ubuntu 24.04 をダウンロード中…")
@@ -181,7 +194,7 @@ def import_cae_base(name, folder, progress):
         if digest.hexdigest() != UBUNTU_BASE_SHA256:
             raise ValueError("Ubuntu イメージの SHA-256 が一致しません。")
         progress("WSL 2 に Ubuntu を登録中…")
-        wsl("--import", name, str(dest.resolve()), str(archive), "--version", "2")
+        register_archive(name, archive, folder, "2")
 
 
 def create_cae(selected, name, folder, progress, user, password, source=""):
@@ -316,7 +329,7 @@ class Manager:
             ttk.Checkbutton(choices, text=label, variable=checked).grid(
                 row=index // 3, column=index % 3, sticky="w", padx=4)
         self.button(actions, "CAE 環境を作成", self.create_cae_environment, primary=True)
-        self.button(actions, "インストール", self.install)
+        self.button(actions, "WSL にディストリビューションを追加", self.install)
         self.button(actions, "インポート", self.import_distro)
         table = tk.Frame(body)
         table.pack(fill="both", expand=True)
@@ -442,7 +455,7 @@ class Manager:
                         v.set(path)
                 ttk.Button(line, text="参照", command=pick_sif).pack(side="left")
                 ttk.Button(line, text="公式配布ページ", command=lambda: webbrowser.open(salome_image.RELEASE_PAGE)).pack(side="left")
-            if kind in ("file", "directory"):
+            if kind in ("file", "optional_directory"):
                 def browse(v=var, k=kind):
                     path = (filedialog.askopenfilename(parent=dialog, filetypes=[("tar アーカイブ", "*.tar"), ("すべて", "*")])
                             if k == "file" else filedialog.askdirectory(parent=dialog))
@@ -453,8 +466,8 @@ class Manager:
             try:
                 values = [v.get() if field[2] == "password" else v.get().strip()
                           for v, field in zip(variables, fields)]
-                if not all(values):
-                    raise ValueError("すべての項目を入力してください。")
+                if any(not value and field[2] != "optional_directory" for value, field in zip(values, fields)):
+                    raise ValueError("必須項目を入力してください。")
                 submit(*values)
             except ValueError as error:
                 messagebox.showerror(title, str(error), parent=dialog)
@@ -477,7 +490,7 @@ class Manager:
         fields = []
         if not wizard:
             default = CAE_PROFILES[selected[0]].default_name if len(selected) == 1 else "CAE-Workspace"
-            fields.extend([("新しい登録名", default, None), ("保存先フォルダー（空）", "", "directory")])
+            fields.extend([("新しい登録名", default, None), ("保存先（任意・空欄で WSL の既定）", "", "optional_directory")])
         fields.extend(ACCOUNT_FIELDS)
         if any(CAE_PROFILES[label].sif_source for label in selected if label != OPENFOAM_WIZARD):
             fields.append(("公式 .sif の直接リンク（HTTPS）または取得済みファイル", "", "sif"))
@@ -509,8 +522,8 @@ class Manager:
                 wsl("--install", "-d", name, "--name", name, "--no-launch")
                 create_linux_account(("-d", name, "-u", "root", "--exec"), user, password)
                 wsl("--manage", name, "--set-default-user", user)
-            self.change("インストール", install_new)
-        self.form("インストール", [("ディストリビューション名", "Ubuntu",
+            self.change("WSL にディストリビューションを追加", install_new)
+        self.form("WSL にディストリビューションを追加", [("ディストリビューション名", "Ubuntu",
                                   ("Ubuntu", "Debian", "kali-linux", "openSUSE-Tumbleweed")), *ACCOUNT_FIELDS], submit,
                   "新規環境に作成する Linux ユーザーを指定してください。")
 
@@ -518,11 +531,12 @@ class Manager:
         def submit(name, source, folder, version):
             if not re.fullmatch(r"[\w][\w.-]*", name) or name.casefold() in {r[0].casefold() for r in self.rows}:
                 raise ValueError("未使用の名前を指定してください。文字、数字、ピリオド、ハイフン、下線が使えます。")
-            if not Path(source).is_file() or not Path(folder).is_dir() or any(Path(folder).iterdir()):
-                raise ValueError("既存のアーカイブと、空の保存先フォルダーを指定してください。")
-            self.change("インポート", lambda: wsl("--import", name, folder, source, "--version", version))
+            if not Path(source).is_file():
+                raise ValueError("既存のアーカイブを指定してください。")
+            validate_install_folder(folder)
+            self.change("インポート", lambda: register_archive(name, source, folder, version))
         self.form("インポート", [("登録名", "", None), ("tar アーカイブ", "", "file"),
-                                 ("保存先フォルダー（空）", "", "directory"),
+                                 ("保存先（任意・空欄で WSL の既定）", "", "optional_directory"),
                                  ("WSL バージョン", "2", ("1", "2"))], submit)
 
     def export(self):
