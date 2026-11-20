@@ -15,7 +15,9 @@ echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/openfoam.asc] https://dl.openf
 apt-get -o APT::Update::Error-Mode=any update
 apt-get install -y --no-install-recommends openfoam12
 init='source /opt/openfoam12/etc/bashrc'
-grep -Fxq "$init" "$user_home/.bashrc" || echo "$init" >> "$user_home/.bashrc"
+if ! grep -Eq '^(source|\.) (/opt/openfoam|/usr/lib/openfoam/).*etc/bashrc$' "$user_home/.bashrc"; then
+    echo "$init" >> "$user_home/.bashrc"
+fi
 runuser -u "$linux_user" -- env HOME="$user_home" bash -c '
     cd "$HOME" || exit 1
     source /opt/openfoam12/etc/bashrc

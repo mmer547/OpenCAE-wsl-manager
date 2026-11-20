@@ -20,5 +20,5 @@ if "%OPENFOAM_EXIT%"=="2" (
 ) else (
   echo Installation completed successfully.
 )
-pause
+if not defined WSL_MANAGER_RESULT pause
 exit /b %OPENFOAM_EXIT%

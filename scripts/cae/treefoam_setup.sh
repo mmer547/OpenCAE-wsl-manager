@@ -2,7 +2,7 @@
 set -euo pipefail
 cd /
 export DEBIAN_FRONTEND=noninteractive
-bash /root/openfoam_setup.sh
+test -r /opt/openfoam12/etc/bashrc
 apt-get install -y --no-install-recommends unzip paraview python3-vtk9 python3-pyqt5 \
     python3-gi python3-gi-cairo gir1.2-gtk-3.0 nautilus gnome-terminal gedit \
     dbus-x11 locales fonts-noto-cjk gettext xclip wl-clipboard

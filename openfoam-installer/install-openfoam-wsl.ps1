@@ -431,6 +431,10 @@ bash -lc '. $OpenFoamEtc && test -n "`$WM_PROJECT_VERSION" && test -n "`$WM_PROJ
     Write-Host '============================================================'
 
     Write-Host ''
+    if ($env:WSL_MANAGER_RESULT) {
+        [IO.File]::WriteAllText($env:WSL_MANAGER_RESULT, $distributionName)
+        exit 0
+    }
     $launchChoice = (Read-Host 'インストールしたWSLを今すぐ起動しますか？ [y/N]').Trim()
     if ($launchChoice -match '^(?i:y|yes)$') {
         Write-Host "WSL「$distributionName」を起動します。終了するにはLinux側で exit を実行してください。"

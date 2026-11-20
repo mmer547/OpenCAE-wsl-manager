@@ -155,8 +155,7 @@ def create_linux_account(root, user, password):
         raise RuntimeError(f"パスワードを設定できませんでした。root で passwd {user} を実行してください。") from None
 
 
-def create_cae(software, name, folder, progress, user, password, source=""):
-    profile = CAE_PROFILES[software]
+def import_cae_base(name, folder, progress):
     arch = os.environ.get("PROCESSOR_ARCHITEW6432") or platform.machine()
     if arch.lower() not in ("amd64", "x86_64"):
         raise ValueError("この CAE 環境には x64 版 Windows が必要です。")
@@ -167,10 +166,6 @@ def create_cae(software, name, folder, progress, user, password, source=""):
     dest = Path(folder)
     if not dest.is_dir() or any(dest.iterdir()):
         raise ValueError("空の保存先フォルダーを選択してください。")
-    script_dir = Path(__file__).resolve().parent / "scripts" / "cae"
-    scripts = {name: (script_dir / name).read_text(encoding="utf-8").encode()
-               for name in (*profile.supporting_scripts, profile.setup_script)}
-    image = salome_image.prepare_image(source, progress) if profile.sif_source else None
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp, "ubuntu.tar.gz")
         progress("Ubuntu 24.04 をダウンロード中…")
@@ -183,25 +178,53 @@ def create_cae(software, name, folder, progress, user, password, source=""):
             raise ValueError("Ubuntu イメージの SHA-256 が一致しません。")
         progress("WSL 2 に Ubuntu を登録中…")
         wsl("--import", name, str(dest.resolve()), str(archive), "--version", "2")
+
+
+def create_cae(selected, name, folder, progress, user, password, source=""):
+    if not selected:
+        raise ValueError("ソフトを1つ以上選んでください。")
+    wizard = OPENFOAM_WIZARD in selected
+    profiles = [CAE_PROFILES[label] for label in selected if label != OPENFOAM_WIZARD]
+    script_dir = Path(__file__).resolve().parent / "scripts" / "cae"
+    steps = {}
+    for profile in profiles:
+        for filename in (*profile.supporting_scripts, profile.setup_script):
+            steps.setdefault(filename, profile.default_name)
+    scripts = {filename: (script_dir / filename).read_text(encoding="utf-8").encode()
+               for filename in (*steps, "resume.sh")}
+    image = salome_image.prepare_image(source, progress) if any(p.sif_source for p in profiles) else None
+    if wizard:
+        progress("OpenFOAM の配布元と版をコンソールで選択してください")
+        name = run_openfoam_wizard(user, password)
+        if name is None:
+            return "OpenFOAM 環境の作成をキャンセルしました"
+        if not steps:
+            return f"「{name}」の作成が完了しました"
+    else:
+        import_cae_base(name, folder, progress)
     root = ("-d", name, "-u", "root", "--exec")
+    stage = "初期設定"
     try:
-        progress(f"{software} をセットアップ中…")
-        remote_script = f"/root/{profile.setup_script}"
         for filename, content in scripts.items():
             wsl(*root, "tee", f"/root/{filename}", input_data=content)
         if image is not None:
             linux_path = wsl(*root, "wslpath", "-a", str(image))
             wsl(*root, "tee", "/root/salome-meca-source", input_data=(linux_path + "\n").encode())
-        create_linux_account(root, user, password)
-        wsl(*root, "usermod", "-s", "/bin/bash", user)
+        if not wizard:
+            create_linux_account(root, user, password)
+            wsl(*root, "usermod", "-s", "/bin/bash", user)
+            wsl(*root, "tee", "/etc/wsl.conf", input_data=f"[user]\ndefault={user}\n".encode())
         wsl(*root, "tee", "/root/wsl-manager-user", input_data=(user + "\n").encode())
-        wsl(*root, "tee", "/etc/wsl.conf", input_data=f"[user]\ndefault={user}\n".encode())
-        wsl(*root, "bash", remote_script)
+        wsl(*root, "tee", "/root/wsl-manager-plan", input_data=("\n".join(steps) + "\n").encode())
+        for index, filename in enumerate(steps, 1):
+            stage = filename
+            progress(f"{name}（{index}/{len(steps)}） {steps[filename]} を導入中…")
+            wsl(*root, "bash", "/root/resume.sh", filename)
         wsl("--terminate", name)
     except (RuntimeError, OSError) as error:
-        raise RuntimeError(f"「{name}」は登録済みです。一覧を更新してください。"
+        raise RuntimeError(f"「{name}」の {stage} で停止しました。環境は登録済みです。一覧を更新してください。"
                            f"再開手順は README の「途中で失敗した場合」を参照してください。\n{error}") from error
-
+    return f"「{name}」の作成が完了しました"
 
 
 def run_openfoam_wizard(user, password):
@@ -230,16 +253,21 @@ def run_openfoam_wizard(user, password):
                                creationflags=subprocess.CREATE_NO_WINDOW)
     if protected.returncode or not re.fullmatch(rb"[0-9a-fA-F]+", protected.stdout.strip()):
         raise RuntimeError("OpenFOAM インストーラー用の認証情報を保護できませんでした。")
-    result = subprocess.run(command, executable=str(system / "cmd.exe"),
-                            env={**os.environ, "WSL_MANAGER_INSTALLER_DIR": str(directory),
-                                 "WSL_MANAGER_USER": user,
-                                 "WSL_MANAGER_DPAPI": protected.stdout.strip().decode("ascii")},
-                            creationflags=subprocess.CREATE_NEW_CONSOLE)
-    if result.returncode == 0:
-        return "OpenFOAM 環境の作成が完了しました"
-    if result.returncode == 2:
-        return "OpenFOAM 環境の作成をキャンセルしました"
-    return f"OpenFOAM のインストーラーが終了しました（終了コード {result.returncode}）。作成途中の環境を確認してください"
+    with tempfile.TemporaryDirectory() as tmp:
+        result_file = Path(tmp, "distribution.txt")
+        result = subprocess.run(command, executable=str(system / "cmd.exe"),
+                                env={**os.environ, "WSL_MANAGER_INSTALLER_DIR": str(directory),
+                                     "WSL_MANAGER_USER": user, "WSL_MANAGER_RESULT": str(result_file),
+                                     "WSL_MANAGER_DPAPI": protected.stdout.strip().decode("ascii")},
+                                creationflags=subprocess.CREATE_NEW_CONSOLE)
+        if result.returncode == 2:
+            return None
+        if result.returncode:
+            raise RuntimeError(f"OpenFOAM の導入に失敗しました（終了コード {result.returncode}）。")
+        name = result_file.read_text(encoding="utf-8-sig").strip()
+        if not re.fullmatch(r"OpenFOAM-(?:Foundation-[0-9]+|Keysight-v[0-9]+)(?:-[0-9]+)?", name):
+            raise RuntimeError("OpenFOAM の登録名を確認できませんでした。")
+        return name
 
 
 class Manager:
@@ -250,8 +278,8 @@ class Manager:
         self.busy = False
         self.rows = []
         root.title("WSL Manager")
-        root.geometry("920x580")
-        root.minsize(740, 480)
+        root.geometry("920x740")
+        root.minsize(740, 620)
         root.configure(bg="#f1f5f9")
         style = ttk.Style()
         style.theme_use("clam")
@@ -274,9 +302,14 @@ class Manager:
         self.button(title, "更新", self.refresh, side="right")
         actions = tk.Frame(body, bg="#f1f5f9")
         actions.pack(fill="x", pady=(0, 12))
-        self.software = tk.StringVar(value=next(iter(CAE_PROFILES)))
-        ttk.Combobox(actions, textvariable=self.software, values=(OPENFOAM_WIZARD, *CAE_PROFILES),
-                     state="readonly", width=25).pack(side="left", padx=(0, 6))
+        choices = ttk.LabelFrame(body, text="インストールする CAE ソフト（複数選択可）", padding=6)
+        choices.pack(before=actions, fill="x", pady=(0, 8))
+        self.software = {}
+        for index, label in enumerate((OPENFOAM_WIZARD, *CAE_PROFILES)):
+            checked = tk.BooleanVar(value=False)
+            self.software[label] = checked
+            ttk.Checkbutton(choices, text=label, variable=checked).grid(
+                row=index // 3, column=index % 3, sticky="w", padx=4)
         self.button(actions, "CAE 環境を作成", self.create_cae_environment, primary=True)
         self.button(actions, "インストール", self.install)
         self.button(actions, "インポート", self.import_distro)
@@ -429,26 +462,34 @@ class Manager:
         dialog.grab_set()
 
     def create_cae_environment(self):
-        software = self.software.get()
-        if software == OPENFOAM_WIZARD:
-            def start_wizard(user, password, confirmation):
-                validate_account(user, password, confirmation)
-                self.run("OpenFOAM インストーラーで操作",
-                         lambda: run_openfoam_wizard(user, password), self.refresh)
-            self.form("OpenFOAM 環境を作成", ACCOUNT_FIELDS, start_wizard,
-                      "作成する Linux ユーザーを指定してください。続く画面で配布元と版を選択します。")
+        selected = tuple(label for label, checked in self.software.items() if checked.get())
+        if not selected:
+            messagebox.showinfo("CAE 環境を作成", "ソフトを1つ以上選んでください。", parent=self.root)
             return
-        profile = CAE_PROFILES[software]
-        fields = [("新しい登録名", profile.default_name, None), ("保存先フォルダー（空）", "", "directory"),
-                  *ACCOUNT_FIELDS]
-        if profile.sif_source:
+        wizard = OPENFOAM_WIZARD in selected
+        fields = []
+        if not wizard:
+            default = CAE_PROFILES[selected[0]].default_name if len(selected) == 1 else "CAE-Workspace"
+            fields.extend([("新しい登録名", default, None), ("保存先フォルダー（空）", "", "directory")])
+        fields.extend(ACCOUNT_FIELDS)
+        if any(CAE_PROFILES[label].sif_source for label in selected if label != OPENFOAM_WIZARD):
             fields.append(("公式 .sif の直接リンク（HTTPS）または取得済みファイル", "", "sif"))
-        def submit(name, folder, user, password, confirmation, source=""):
+
+        def submit(*values):
+            if wizard:
+                name, folder = "", ""
+            else:
+                name, folder, *values = values
+            user, password, confirmation, *source = values
             validate_account(user, password, confirmation)
-            self.change(f"{software} 環境の作成",
-                        lambda: create_cae(software, name, folder, self.progress.put, user, password, source))
-        self.form("CAE 環境を作成", fields, submit,
-                  f"Ubuntu 24.04 に {software} を導入した専用の WSL 2 環境を作成します。")
+            self.run("CAE 環境の作成",
+                     lambda: create_cae(selected, name, folder, self.progress.put, user, password,
+                                        source[0] if source else ""), self.refresh)
+
+        prompt = "同じ WSL 環境に導入します。 " + "、".join(selected)
+        if wizard:
+            prompt += "。続くコンソールで OpenFOAM の配布元と版を選択します。"
+        self.form("CAE 環境を作成", fields, submit, prompt)
 
     def install(self):
         def submit(name, user, password, confirmation):
