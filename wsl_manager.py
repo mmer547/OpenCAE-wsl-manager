@@ -160,9 +160,7 @@ def create_linux_account(root, user, password, *, ubuntu_base=False):
         command = ("/usr/sbin/chpasswd", "--crypt-method", "YESCRYPT") if ubuntu_base else ("chpasswd",)
         wsl(*root, *command, input_data=f"{user}:{password}\n".encode("utf-8"))
     except RuntimeError:
-        if ubuntu_base:
-            raise RuntimeError(f"パスワードを設定できませんでした。PowerShell で py -3 repair_cae.py {root[1]} {user} を実行してください。") from None
-        raise RuntimeError(f"パスワードを設定できませんでした。root で passwd {user} を実行してください。") from None
+        raise RuntimeError(f"「{user}」のパスワードを設定できませんでした。") from None
 
 
 def validate_install_folder(folder):
@@ -201,6 +199,16 @@ def import_cae_base(name, folder, progress):
             raise ValueError("Ubuntu イメージの SHA-256 が一致しません。")
         progress("WSL 2 に Ubuntu を登録中…")
         register_archive(name, archive, folder, "2")
+
+
+def discard_failed_environment(name, stage, error):
+    try:
+        wsl("--unregister", name)
+    except (RuntimeError, OSError) as cleanup_error:
+        raise RuntimeError(f"「{name}」の{stage}で失敗しました。{error}\n"
+                           f"自動削除にも失敗しました。一覧を更新して「{name}」を確認してください。\n"
+                           f"{cleanup_error}") from error
+    raise RuntimeError(f"「{name}」の{stage}で失敗したため、この環境を削除しました。\n{error}") from error
 
 
 def create_cae(selected, name, folder, progress, user, password, source=""):
@@ -244,9 +252,8 @@ def create_cae(selected, name, folder, progress, user, password, source=""):
             progress(f"{name}（{index}/{len(steps)}） {steps[filename]} を導入中…")
             wsl(*root, "bash", "/root/resume.sh", filename)
         wsl("--terminate", name)
-    except (RuntimeError, OSError) as error:
-        raise RuntimeError(f"「{name}」の {stage} で停止しました。環境は登録済みです。一覧を更新してください。"
-                           f"再開手順は README の「途中で失敗した場合」を参照してください。\n{error}") from error
+    except Exception as error:
+        discard_failed_environment(name, stage, error)
     return f"「{name}」の作成が完了しました"
 
 
@@ -286,6 +293,9 @@ def run_openfoam_wizard(user, password):
         if result.returncode == 2:
             return None
         if result.returncode:
+            error_file = Path(tmp, "distribution.txt.error")
+            if error_file.is_file():
+                raise RuntimeError(error_file.read_text(encoding="utf-8-sig"))
             raise RuntimeError(f"OpenFOAM の導入に失敗しました（終了コード {result.returncode}）。")
         name = result_file.read_text(encoding="utf-8-sig").strip()
         if not re.fullmatch(r"OpenFOAM-(?:Foundation-[0-9]+|Keysight-v[0-9]+)(?:-[0-9]+)?", name):
@@ -525,8 +535,11 @@ class Manager:
                 if name.casefold() in {row[0].casefold() for row in inventory()}:
                     raise ValueError("この登録名は既に使用されています。")
                 wsl("--install", "-d", name, "--name", name, "--no-launch")
-                create_linux_account(("-d", name, "-u", "root", "--exec"), user, password)
-                wsl("--manage", name, "--set-default-user", user)
+                try:
+                    create_linux_account(("-d", name, "-u", "root", "--exec"), user, password)
+                    wsl("--manage", name, "--set-default-user", user)
+                except Exception as error:
+                    discard_failed_environment(name, "初期設定", error)
             self.change("WSL にディストリビューションを追加", install_new)
         self.form("WSL にディストリビューションを追加", [("ディストリビューション名", "Ubuntu",
                                   ("Ubuntu", "Debian", "kali-linux", "openSUSE-Tumbleweed")), *ACCOUNT_FIELDS], submit,

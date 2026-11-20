@@ -283,6 +283,7 @@ function Select-OpenFoamConfiguration {
     }
 }
 
+$registered = $false
 try {
     if ($env:WSL_MANAGER_DPAPI) {
         $secure = ConvertTo-SecureString -String $env:WSL_MANAGER_DPAPI
@@ -361,6 +362,7 @@ try {
         throw "Ubuntuのインストールに失敗しました (終了コード: $LASTEXITCODE)。"
     }
 
+    $registered = $true
     Write-Host "[4/7] Linuxユーザー「$linuxUser」とパスワードを設定しています..."
     $quotedUser = "'$linuxUser'"
     Invoke-Wsl $distributionName @"
@@ -451,7 +453,20 @@ bash -lc '. $OpenFoamEtc && test -n "`$WM_PROJECT_VERSION" && test -n "`$WM_PROJ
 catch {
     Write-Host ''
     Write-Host "エラー: $($_.Exception.Message)" -ForegroundColor Red
-    if ($distributionName -and ((Get-InstalledWslNames) -contains $distributionName)) {
+    if ($env:WSL_MANAGER_RESULT) {
+        $message = $_.Exception.Message
+        if ($registered) {
+            try {
+                & wsl.exe --unregister $distributionName
+                if ($LASTEXITCODE -ne 0) { throw "wsl.exe 終了コード $LASTEXITCODE" }
+                $message += "`n作成途中の環境「$distributionName」を削除しました。"
+            } catch {
+                $message += "`n「$distributionName」の自動削除に失敗しました。一覧を更新してください。$($_.Exception.Message)"
+            }
+        }
+        [IO.File]::WriteAllText("$($env:WSL_MANAGER_RESULT).error", $message)
+    }
+    elseif ($distributionName -and ((Get-InstalledWslNames) -contains $distributionName)) {
         Write-Host "作成途中のWSL「$distributionName」は調査・再利用のため削除していません。"
         Write-Host "不要なら次のコマンドで削除できます: wsl --unregister $distributionName"
     }
