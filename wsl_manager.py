@@ -330,11 +330,13 @@ class Manager:
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", lambda _: self.controls())
+        self.tree.bind("<Double-1>", self.launch_row)
+        self.tree.bind("<Return>", lambda _: self.terminal())
         commands = tk.Frame(body, bg="#f1f5f9")
-        commands.pack(fill="x", pady=(12, 0))
-        for label, handler in (("ターミナル", self.terminal), ("停止", self.stop),
+        commands.pack(before=table, fill="x", side="bottom", pady=(12, 0))
+        for label, handler in (("選択した WSL を起動", self.terminal), ("停止", self.stop),
                                ("既定に設定", self.set_default), ("エクスポート", self.export),
-                               ("削除", self.remove)):
+                               ("選択した WSL を削除", self.remove)):
             self.selected_buttons.append(self.button(commands, label, handler))
         self.status = tk.StringVar(value="")
         tk.Label(root, textvariable=self.status, anchor="w", padx=26, pady=8,
@@ -533,18 +535,30 @@ class Manager:
 
     def remove(self):
         name = self.selected()
+        if self.busy or not name:
+            return
+
         def submit(confirmation):
             if confirmation != name:
                 raise ValueError("入力した名前が一致しません。")
-            self.change("削除", lambda: wsl("--unregister", name))
+            self.change(f"「{name}」の削除", lambda: wsl("--unregister", name))
         self.form("削除", [("確認用のディストリビューション名", "", None)], submit,
                   f"「{name}」の登録と内部の全データを削除します。この操作は取り消せません。")
 
+    def launch_row(self, event):
+        row = self.tree.identify_row(event.y)
+        if row and self.tree.identify_region(event.x, event.y) == "cell":
+            self.tree.selection_set(row)
+            self.terminal()
+
     def terminal(self):
         name = self.selected()
+        if self.busy or not name:
+            return
+
         def launch():
             subprocess.Popen([executable(), "-d", name], creationflags=subprocess.CREATE_NEW_CONSOLE)
-        self.change("ターミナルの起動", launch)
+        self.change(f"「{name}」のターミナル起動", launch)
 
     def stop(self):
         name = self.selected()
