@@ -45,7 +45,11 @@ envfile="$base/openfoam$version/etc/bashrc"
 IFS= read -r linux_user < /root/wsl-manager-user
 user_home=$(getent passwd "$linux_user" | cut -d: -f6)
 runuser -u "$linux_user" -- env HOME="$user_home" bash -c '
-    cd "$HOME" && source "$1" && test "${WM_PROJECT_VERSION#v}" = "$2" && blockMesh -help >/dev/null
+    foam_bashrc=$1
+    expected_version=$2
+    # OpenFOAM treats positional arguments as additional files to source.
+    set --
+    cd "$HOME" && source "$foam_bashrc" && test "${WM_PROJECT_VERSION#v}" = "$expected_version" && blockMesh -help >/dev/null
 ' bash "$envfile" "$version"
 if ! grep -Eq '^(source|\.) (/opt/openfoam|/usr/lib/openfoam/).*etc/bashrc$' "$user_home/.bashrc"; then
     printf 'source %s\n' "$envfile" >> "$user_home/.bashrc"
