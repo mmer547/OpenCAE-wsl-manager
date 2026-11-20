@@ -150,9 +150,12 @@ def validate_account(user, password, confirmation):
 
 def create_linux_account(root, user, password, *, ubuntu_base=False):
     # useradd must succeed before setting a password. Never take over an existing account.
-    wsl(*root, "sh", "-ec",
-        'if command -v useradd >/dev/null; then useradd -m "$1"; '
-        'else adduser -D "$1"; fi', "sh", user)
+    if ubuntu_base:
+        wsl(*root, "/usr/sbin/useradd", "-m", "-s", "/bin/bash", user)
+    else:
+        wsl(*root, "sh", "-ec",
+            'if command -v useradd >/dev/null; then useradd -m "$1"; '
+            'else adduser -D "$1"; fi', "sh", user)
     try:
         command = ("/usr/sbin/chpasswd", "--crypt-method", "YESCRYPT") if ubuntu_base else ("chpasswd",)
         wsl(*root, *command, input_data=f"{user}:{password}\n".encode("utf-8"))
@@ -233,7 +236,6 @@ def create_cae(selected, name, folder, progress, user, password, source=""):
             wsl(*root, "tee", "/root/salome-meca-source", input_data=(linux_path + "\n").encode())
         if not wizard:
             create_linux_account(root, user, password, ubuntu_base=True)
-            wsl(*root, "usermod", "-s", "/bin/bash", user)
             wsl(*root, "tee", "/etc/wsl.conf", input_data=f"[user]\ndefault={user}\n".encode())
         wsl(*root, "tee", "/root/wsl-manager-user", input_data=(user + "\n").encode())
         wsl(*root, "tee", "/root/wsl-manager-plan", input_data=("\n".join(steps) + "\n").encode())

@@ -1,6 +1,7 @@
-"""パスワード設定で停止したマネージャー作成環境を PowerShell から再開する。"""
+"""ユーザー設定で停止したマネージャー作成環境を PowerShell から再開する。"""
 import argparse
 import getpass
+from pathlib import Path
 
 from wsl_manager import CAE_PROFILES, validate_account, wsl
 
@@ -26,14 +27,21 @@ def repair(name, user):
     if not steps or files != set(steps):
         raise ValueError("転送済みスクリプトとこの版のセットアップ内容が一致しません。")
     print(f"対象: {name} / {user}\n再開する処理: {', '.join(steps)}")
-    password = getpass.getpass("Linux パスワード: ")
-    validate_account(user, password, getpass.getpass("確認用パスワード: "))
-    try:
-        wsl(*root, "/usr/sbin/chpasswd", "--crypt-method", "YESCRYPT",
-            input_data=f"{user}:{password}\n".encode())
-    except RuntimeError:
-        raise RuntimeError("パスワードの設定に失敗しました。") from None
-    wsl(*root, "usermod", "-s", "/bin/bash", user)
+    status = wsl(*root, "/usr/bin/passwd", "-S", user).split()
+    if len(status) < 2 or status[0] != user or status[1] not in {"P", "L", "NP"}:
+        raise ValueError("パスワードの設定状態を確認できませんでした。")
+    if status[1] != "P":
+        password = getpass.getpass("Linux パスワード: ")
+        validate_account(user, password, getpass.getpass("確認用パスワード: "))
+        try:
+            wsl(*root, "/usr/sbin/chpasswd", "--crypt-method", "YESCRYPT",
+                input_data=f"{user}:{password}\n".encode())
+        except RuntimeError:
+            raise RuntimeError("パスワードの設定に失敗しました。") from None
+    if account[6].strip() != "/bin/bash":
+        wsl(*root, "/usr/sbin/usermod", "-s", "/bin/bash", user)
+    resume = Path(__file__).resolve().parent / "scripts" / "cae" / "resume.sh"
+    wsl(*root, "tee", "/root/resume.sh", input_data=resume.read_text(encoding="utf-8").encode())
     wsl("--manage", name, "--set-default-user", user)
     wsl(*root, "tee", "/root/wsl-manager-user", input_data=(user + "\n").encode())
     wsl(*root, "tee", "/root/wsl-manager-plan", input_data=("\n".join(steps) + "\n").encode())
