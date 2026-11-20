@@ -37,7 +37,7 @@
 1. 配布元
    - Foundation版（openfoam.org）
    - Keysight版（openfoam.com / OpenCFD）
-2. OpenFOAMのバージョン
+2. 配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で一覧中の最新版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
    - Foundation版: `14`、`13`、`12`、`11`など
    - Keysight版: `2606`、`2512`、`2506`、`2412`など
 

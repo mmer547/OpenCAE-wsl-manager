@@ -208,6 +208,39 @@ function Set-WslUserPassword {
     $passwordHash = $null
 }
 
+function Select-OpenFoamVersion {
+    param([string] $Repository, [string] $VersionPattern, [string] $PackageSuffix = '')
+    $available = @()
+    try {
+        $response = Invoke-WebRequest -UserAgent 'curl/8.0' -UseBasicParsing -ErrorAction Stop -TimeoutSec 30 -Uri "$Repository/dists/noble/main/binary-amd64/Packages"
+        $reader = [IO.StreamReader]::new($response.RawContentStream)
+        try {
+            $index = $reader.ReadToEnd()
+        } finally {
+            $reader.Dispose()
+        }
+        $pattern = "(?m)^Package: openfoam($VersionPattern)$PackageSuffix\r?$"
+        $available = @([regex]::Matches($index, $pattern) |
+            ForEach-Object { $_.Groups[1].Value } | Sort-Object { [int]$_ } -Descending -Unique)
+        if ($available.Count -eq 0) { throw 'Empty package list' }
+    } catch {
+        Write-Warning '公式パッケージ一覧を取得できませんでした。インストールする版を入力してください。'
+    }
+
+    $prompt = 'バージョン'
+    if ($available.Count -gt 0) {
+        Write-Host "Ubuntu 24.04 で選択できる版: $($available -join ', ')"
+        $prompt = "バージョン [最新版 $($available[0])]"
+    }
+    while ($true) {
+        $version = (Read-Host $prompt).Trim()
+        if (-not $version -and $available.Count -gt 0) { return $available[0] }
+        if ($version -cmatch "^($VersionPattern)$" -and
+            ($available.Count -eq 0 -or $version -in $available)) { return $version }
+        Write-Host '配布元のリリース番号を数字で入力してください。' -ForegroundColor Yellow
+    }
+}
+
 function Select-OpenFoamConfiguration {
     Write-Host ''
     Write-Host 'インストールするOpenFOAMの系統を選択してください。'
@@ -221,13 +254,7 @@ function Select-OpenFoamConfiguration {
 
     if ($editionChoice -eq '1') {
         Write-Host ''
-        Write-Host 'Foundation版のバージョンを入力してください。例: 14, 13, 12, 11'
-        do {
-            $version = (Read-Host 'バージョン [14]').Trim()
-            if (-not $version) { $version = '14' }
-            $valid = $version -match '^[1-9][0-9]?$'
-            if (-not $valid) { Write-Host '1～99の整数で入力してください。' -ForegroundColor Yellow }
-        } until ($valid)
+        $version = Select-OpenFoamVersion 'https://dl.openfoam.org/ubuntu' '[1-9][0-9]?'
 
         return [PSCustomObject]@{
             Edition       = 'Foundation'
@@ -242,13 +269,7 @@ function Select-OpenFoamConfiguration {
     }
 
     Write-Host ''
-    Write-Host 'Keysight版のバージョンを年月4桁で入力してください。例: 2606, 2512, 2506, 2412'
-    do {
-        $version = (Read-Host 'バージョン [2606]').Trim()
-        if (-not $version) { $version = '2606' }
-        $valid = $version -match '^[0-9]{4}$' -and $version.Substring(2, 2) -in @('06', '12')
-        if (-not $valid) { Write-Host 'リリース年月をYY06またはYY12の形式で入力してください。' -ForegroundColor Yellow }
-    } until ($valid)
+    $version = Select-OpenFoamVersion 'https://dl.openfoam.com/repos/deb' '[0-9]{2}(?:06|12)' '-default'
 
     return [PSCustomObject]@{
         Edition       = 'Keysight'
