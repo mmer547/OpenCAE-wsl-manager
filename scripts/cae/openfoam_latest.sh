@@ -35,7 +35,9 @@ apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
 index=$(apt-get -o Dir::Etc::sourcelist="$source_file" -o Dir::Etc::sourceparts=- \
     indextargets --format '$(FILENAME)' 'Identifier: Packages' 'Architecture: amd64')
 test -f "$index"
-version=$(/usr/lib/apt/apt-helper cat-file "$index" | sed -nE "s/^Package: $pattern/\\1/p" | sort -nu | tail -1)
+version=$(/usr/lib/apt/apt-helper cat-file "$index" |
+    awk -v RS='' '!/(^|\n)Version: [^\n]*~/' |
+    sed -nE "s/^Package: $pattern/\\1/p" | sort -nu | tail -1)
 if [[ -z "$version" ]]; then
     echo "$repo: Ubuntu 24.04 用の正式リリースが見つかりません。" >&2
     exit 1

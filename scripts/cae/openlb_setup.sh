@@ -6,7 +6,7 @@ user_home=$(getent passwd "$linux_user" | cut -d: -f6)
 test -d "$user_home"
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o APT::Update::Error-Mode=any update
-apt-get install -y --no-install-recommends ca-certificates curl build-essential gnuplot-nox imagemagick
+apt-get install -y --no-install-recommends ca-certificates curl build-essential gnuplot imagemagick
 
 runuser -u "$linux_user" -- env HOME="$user_home" bash <<'BUILD'
 set -euo pipefail

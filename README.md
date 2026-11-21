@@ -55,7 +55,7 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 **OpenFOAM（配布元・版を選択） → CAE 環境を作成** を選びます。
 
 1. GUI で Linux ユーザー名とパスワードを入力して作成を開始すると、専用コンソールが開きます。
-2. Foundation または Keysight（OpenCFD）を選びます。配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で一覧中の最新版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
+2. Foundation または Keysight（OpenCFD）を選びます。配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で一覧中の最新の正式版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
 3. 続行すると Ubuntu 24.04 LTS の WSL 2 を作成します。登録名が重複すると `-2`、`-3` と自動採番されます。設定したユーザーで sudo を使えます。
 4. OpenFOAM の検証が完了すると、マネージャーが同じ登録名の環境に残りのソフトを自動で導入します。
 
@@ -118,15 +118,17 @@ if ($LASTEXITCODE -eq 0) { wsl --terminate $name }
 | OpenCourant | 公式 Linux x86-64 版（2026-10-11、OpenMP） | `starter_linux64_gf -version`、`engine_linux64_gf -version` |
 | OpenModelica | 公式 stable 版のコンパイラ、OMEdit、標準ライブラリ | `OMEdit` または `omc --version` |
 | FreeCAD | FreeCAD メンテナーの stable PPA 版 | `freecad` |
-| TreeFOAM | TreeFoam 3.38 日本語版、OpenFOAM Foundation 12、ParaView | `treefoam` |
+| TreeFOAM | TreeFoam 3.38 日本語版、OpenFOAM Foundation 12、ParaView（下記参照） | `treefoam` |
 | Netgen | Ubuntu のメッシュ生成 GUI と Python バインディング | `netgen` |
 | Gmsh | Ubuntu パッケージ | `gmsh` |
 | ParaView | Ubuntu パッケージ | `paraview` |
 | Elmer FEM | Elmer CSC の Ubuntu 24.04 用 PPA | `ElmerSolver case.sif` |
 | SU2 | 公式 8.6.0 OpenMP 版 | `SU2_CFD case.cfg` |
 | Code_Saturne | 公式 9.0.2 ソース、Qt5 GUI | `code_saturne gui` |
-| MBDyn | 公式 Git ソース（767fd42e） | `mbdyn -f model.mbd` |
+| MBDyn | 公式ソースアーカイブ（767fd42e、SHA-256 照合） | `mbdyn -f model.mbd` |
 
 Code_Saturne と MBDyn は WSL 内でコンパイルするため、初回の環境作成に時間がかかります。長いビルドの途中でエラーが出た場合も、上記の「途中で失敗した場合」の手順で再実行できます。
+
+TreeFOAM は Ubuntu の `python3-vtk9` を使用します。同じ環境では、APT の競合により任意パッケージの `python3-paraview` が外れます。ParaView の GUI 本体は引き続き利用できます。
 
 TreeFOAM のケース用フォルダーは `~/OpenFOAM/run` です。PyFoam を使うログ監視と DEXCS 拡張はこの構成の対象外です。TreeFOAM の再開時には、同じ環境の `/root/openfoam_setup.sh` も使用します。

@@ -211,6 +211,7 @@ function Set-WslUserPassword {
 function Select-OpenFoamVersion {
     param([string] $Repository, [string] $VersionPattern, [string] $PackageSuffix = '')
     $available = @()
+    $latest = $null
     try {
         $response = Invoke-WebRequest -UserAgent 'curl/8.0' -UseBasicParsing -ErrorAction Stop -TimeoutSec 30 -Uri "$Repository/dists/noble/main/binary-amd64/Packages"
         $reader = [IO.StreamReader]::new($response.RawContentStream)
@@ -220,6 +221,9 @@ function Select-OpenFoamVersion {
             $reader.Dispose()
         }
         $pattern = "(?m)^Package: openfoam($VersionPattern)$PackageSuffix\r?$"
+        $releaseRecords = $index -split '\r?\n\r?\n' | Where-Object { $_ -notmatch '(?m)^Version: [^\r\n]*~' }
+        $latest = [regex]::Matches(($releaseRecords -join "`n"), $pattern) |
+            ForEach-Object { $_.Groups[1].Value } | Sort-Object { [int]$_ } -Descending | Select-Object -First 1
         $available = @([regex]::Matches($index, $pattern) |
             ForEach-Object { $_.Groups[1].Value } | Sort-Object { [int]$_ } -Descending -Unique)
         if ($available.Count -eq 0) { throw 'Empty package list' }
@@ -230,11 +234,11 @@ function Select-OpenFoamVersion {
     $prompt = 'バージョン'
     if ($available.Count -gt 0) {
         Write-Host "Ubuntu 24.04 で選択できる版: $($available -join ', ')"
-        $prompt = "バージョン [最新版 $($available[0])]"
+        if ($latest) { $prompt = "バージョン [最新の正式版 $latest]" }
     }
     while ($true) {
         $version = (Read-Host $prompt).Trim()
-        if (-not $version -and $available.Count -gt 0) { return $available[0] }
+        if (-not $version -and $latest) { return $latest }
         if ($version -cmatch "^($VersionPattern)$" -and
             ($available.Count -eq 0 -or $version -in $available)) { return $version }
         Write-Host '配布元のリリース番号を数字で入力してください。' -ForegroundColor Yellow

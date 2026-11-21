@@ -63,7 +63,7 @@ WSL 内に Apptainer を導入し、GUI で指定したユーザーのホーム�
 
 ## OpenFOAM の対話インストーラー
 
-配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で一覧中の最新版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
+配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で一覧中の最新の正式版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
 
 「OpenFOAM（配布元・版を選択）」は、同梱した BAT と PowerShell スクリプトを独立した Windows コンソールで実行する。参照元の main のコミット e46c67c を使用した。[参照した実装](https://github.com/mmer547/OpenFOAM_bat_installer/tree/e46c67cc63a2c21c906d6777ccd81bcfa01932f4)
 
@@ -71,9 +71,11 @@ WSL 内に Apptainer を導入し、GUI で指定したユーザーのホーム�
 
 ## 追加の7プロファイル
 
-CalculiX、Gmsh、ParaView は Ubuntu 24.04 のパッケージ、Elmer FEM は Elmer CSC の noble 用 PPA を使用する。Elmer の署名鍵は指紋を照合し、APT ソースに限定する。SU2 は公式の x86-64 OpenMP バイナリ、Code_Saturne は公式タグのソースを使用し、ダウンロード後に SHA-256 を照合する。MBDyn は公式 Git の固定コミットからビルドする。各プロファイルは起動コマンドの存在またはバージョン・ヘルプ応答を確認する。導入先、再開方法、起動例は操作ガイドを参照。
+CalculiX、Gmsh、ParaView は Ubuntu 24.04 のパッケージ、Elmer FEM は Elmer CSC の noble 用 PPA を使用する。Elmer の署名鍵は指紋を照合し、APT ソースに限定する。SU2 は公式の x86-64 OpenMP バイナリ、Code_Saturne は公式タグのソースを使用し、ダウンロード後に SHA-256 を照合する。MBDyn は公式 GitLab の固定コミットのアーカイブを再試行付きで取得し、SHA-256 を照合してビルドする。各プロファイルは起動コマンドの存在またはバージョン・ヘルプ応答を確認する。導入先、再開方法、起動例は操作ガイドを参照。
 
 検証では7本それぞれの登録名、転送スクリプト、実行コマンドを模擬 WSL で照合した。Linux 上で SU2 8.6.0 のヘルプ起動と、Ubuntu 配布版 CalculiX CCX 2.21 による四面体の静解析を確認した。全7本の Windows 実機でのインストールと GUI 起動は未検証。
+
+Ubuntu 24.04 amd64 の Base イメージのパッケージ状態と各配布元の索引を使い、チェックリストの16構成について APT の依存解決を検証した。個別選択、全選択、画面の順番での逐次導入をシミュレーションした。OpenLB は Foundation と共存できる `gnuplot` を指定する。ParaView の導入確認は `paraview` の存在と `pvserver --version` で行う。この検証には WSLg の描画、SIF の起動、ソースビルドの完走は含まない。
 
 ## Netgen
 
