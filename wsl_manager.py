@@ -5,6 +5,7 @@ import platform
 import urllib.request
 import webbrowser
 
+import manager_theme as theme
 import salome_image
 import queue
 import re
@@ -103,30 +104,31 @@ class CaeProfile:
     sif_source: bool = False
     supporting_scripts: tuple = ()
     resources: tuple = ()
+    category: str = "その他"
 
 
 OPENFOAM_WIZARD = "OpenFOAM（配布元・版を選択）"
 
 
 CAE_PROFILES = {
-    "OpenFOAM Foundation（最新版）": CaeProfile("OpenFOAM-Foundation", "openfoam_foundation_setup.sh",
+    "OpenFOAM Foundation（最新版）": CaeProfile("OpenFOAM-Foundation", "openfoam_foundation_setup.sh", category="流体解析",
                                             resources=("openfoam_latest.sh",)),
-    "OpenFOAM Keysight（最新版）": CaeProfile("OpenFOAM-Keysight", "openfoam_keysight_setup.sh",
+    "OpenFOAM Keysight（最新版）": CaeProfile("OpenFOAM-Keysight", "openfoam_keysight_setup.sh", category="流体解析",
                                          resources=("openfoam_latest.sh",)),
-    "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", sif_source=True),
-    "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh"),
-    "CalculiX": CaeProfile("CalculiX", "calculix_setup.sh"),
-    "OpenCourant": CaeProfile("OpenCourant", "opencourant_setup.sh"),
-    "OpenModelica": CaeProfile("OpenModelica", "openmodelica_setup.sh"),
-    "FreeCAD": CaeProfile("FreeCAD", "freecad_setup.sh"),
-    "TreeFOAM": CaeProfile("TreeFOAM", "treefoam_setup.sh", supporting_scripts=("openfoam_setup.sh",)),
-    "Netgen": CaeProfile("Netgen", "netgen_setup.sh"),
-    "Gmsh": CaeProfile("Gmsh", "gmsh_setup.sh"),
-    "ParaView": CaeProfile("ParaView", "paraview_setup.sh"),
-    "Elmer FEM": CaeProfile("Elmer-FEM", "elmer_setup.sh"),
-    "SU2": CaeProfile("SU2", "su2_setup.sh"),
-    "Code_Saturne": CaeProfile("Code-Saturne", "code_saturne_setup.sh"),
-    "MBDyn": CaeProfile("MBDyn", "mbdyn_setup.sh"),
+    "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", category="構造・連成解析", sif_source=True),
+    "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh", category="流体解析"),
+    "CalculiX": CaeProfile("CalculiX", "calculix_setup.sh", category="構造・連成解析"),
+    "OpenCourant": CaeProfile("OpenCourant", "opencourant_setup.sh", category="構造・連成解析"),
+    "OpenModelica": CaeProfile("OpenModelica", "openmodelica_setup.sh", category="構造・連成解析"),
+    "FreeCAD": CaeProfile("FreeCAD", "freecad_setup.sh", category="CAD・メッシュ・可視化"),
+    "TreeFOAM": CaeProfile("TreeFOAM", "treefoam_setup.sh", category="流体解析", supporting_scripts=("openfoam_setup.sh",)),
+    "Netgen": CaeProfile("Netgen", "netgen_setup.sh", category="CAD・メッシュ・可視化"),
+    "Gmsh": CaeProfile("Gmsh", "gmsh_setup.sh", category="CAD・メッシュ・可視化"),
+    "ParaView": CaeProfile("ParaView", "paraview_setup.sh", category="CAD・メッシュ・可視化"),
+    "Elmer FEM": CaeProfile("Elmer-FEM", "elmer_setup.sh", category="構造・連成解析"),
+    "SU2": CaeProfile("SU2", "su2_setup.sh", category="流体解析"),
+    "Code_Saturne": CaeProfile("Code-Saturne", "code_saturne_setup.sh", category="流体解析"),
+    "MBDyn": CaeProfile("MBDyn", "mbdyn_setup.sh", category="構造・連成解析"),
 }
 
 
@@ -310,73 +312,158 @@ class Manager:
         self.progress = queue.SimpleQueue()
         self.busy = False
         self.rows = []
-        root.title("WSL Manager")
-        root.geometry("920x740")
-        root.minsize(740, 620)
-        root.configure(bg="#f1f5f9")
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure(".", font=("Yu Gothic UI", 10))
-        style.configure("Treeview", rowheight=42, background="white", fieldbackground="white", borderwidth=0)
-        style.configure("Treeview.Heading", background="#e7edf3", padding=8, relief="flat")
-        style.map("Treeview", background=[("selected", "#d7f0ec")], foreground=[("selected", "#123c38")])
-        header = tk.Frame(root, bg="#172b3a", padx=28, pady=15)
-        header.pack(fill="x")
-        tk.Label(header, text="▸_   WSL Manager", font=("Segoe UI", 18, "bold"),
-                 fg="white", bg="#172b3a").pack(side="left")
-        body = tk.Frame(root, bg="#f1f5f9", padx=26, pady=20)
-        body.pack(fill="both", expand=True)
-        title = tk.Frame(body, bg="#f1f5f9")
-        title.pack(fill="x", pady=(0, 14))
-        tk.Label(title, text="ディストリビューション", font=("Yu Gothic UI", 18, "bold"),
-                 fg="#172b3a", bg="#f1f5f9").pack(side="left")
         self.buttons = []
         self.selected_buttons = []
-        self.button(title, "更新", self.refresh, side="right")
-        actions = tk.Frame(body, bg="#f1f5f9")
+        self.software = {label: tk.BooleanVar(root) for label in (OPENFOAM_WIZARD, *CAE_PROFILES)}
+        self.status = tk.StringVar(root)
+        self.choice_count = tk.StringVar(root)
+        self.inventory_count = tk.StringVar(root, "一覧を取得中…")
+        root.title("OpenCAE · WSL Manager")
+        width = min(1090, root.winfo_screenwidth() - 40)
+        height = min(750, root.winfo_screenheight() - 96)
+        root.geometry(f"{max(730, width)}x{max(540, height)}")
+        root.minsize(730, 540)
+        self.family = theme.configure(root)
+        theme.masthead(root)
+
+        footer = tk.Frame(root, background=theme.WHITE, padx=24, pady=5)
+        footer.pack(side="bottom", fill="x")
+        self.activity = ttk.Progressbar(footer, length=55, mode="indeterminate")
+        tk.Label(footer, textvariable=self.status, anchor="w", bg=theme.WHITE,
+                 fg=theme.MUTED).pack(side="left", fill="x", expand=True)
+
+        self.pages = ttk.Notebook(root)
+        self.pages.pack(fill="both", expand=True, padx=22, pady=(14, 10))
+        catalog = ttk.Frame(self.pages, padding=(5, 13, 5, 4))
+        inventory_page = ttk.Frame(self.pages, padding=(5, 13, 5, 4))
+        self.pages.add(catalog, text="CAE 環境の作成")
+        self.pages.add(inventory_page, text="WSL 環境の管理")
+        self.pages.enable_traversal()
+        self.build_catalog(catalog)
+        self.build_inventory(inventory_page)
+        self.controls()
+        root.protocol("WM_DELETE_WINDOW", self.close)
+        root.after(80, self.poll)
+        self.refresh()
+
+    def build_catalog(self, page):
+        ttk.Label(page, text="ソフトウェアを選択", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(page, text="新しい WSL 環境にまとめてインストールするソフトを選んでください。",
+                  style="Hint.TLabel").pack(anchor="w", pady=(1, 12))
+        actions = ttk.Frame(page, padding=(0, 10, 0, 0))
+        actions.pack(side="bottom", fill="x")
+        ttk.Label(actions, textvariable=self.choice_count).pack(side="left")
+        self.create_button = self.button(actions, "CAE 環境を作成", self.create_cae_environment, primary=True, side="right")
+
+        viewport = tk.Canvas(page, bg=theme.PAPER, highlightthickness=0, width=1, height=1)
+        scroll = ttk.Scrollbar(page, command=viewport.yview)
+        scroll.pack(side="right", fill="y")
+        viewport.configure(yscrollcommand=scroll.set, yscrollincrement=16)
+        viewport.pack(fill="both", expand=True)
+        groups = ttk.Frame(viewport)
+        window = viewport.create_window(0, 0, anchor="nw", window=groups)
+        cards = {}
+        self.checks = []
+        for label, variable in self.software.items():
+            category = "流体解析" if label == OPENFOAM_WIZARD else CAE_PROFILES[label].category
+            if category not in cards:
+                card = tk.Frame(groups, bg=theme.WHITE, highlightbackground=theme.LINE, highlightthickness=1)
+                cards[category] = card
+                bar = tk.Frame(card, bg=theme.WHITE)
+                bar.pack(fill="x", padx=12, pady=(12, 10))
+                tk.Frame(bar, width=4, bg=theme.TEAL).pack(side="left", fill="y", padx=(0, 9))
+                tk.Label(bar, text=category, bg=theme.WHITE, fg=theme.INK,
+                         font=(self.family, 12, "bold")).pack(side="left")
+                ttk.Separator(card).pack(fill="x")
+            check = ttk.Checkbutton(cards[category], text=label, variable=variable,
+                                    style="Catalog.TCheckbutton", command=self.controls)
+            check.pack(anchor="w", fill="x", padx=4, pady=1)
+            self.checks.append(check)
+
+        def reflow(event):
+            # One, two or three columns according to the actual font and window size.
+            minimum = max(card.winfo_reqwidth() for card in cards.values()) + 12
+            columns = max(1, min(len(cards), event.width // minimum))
+            viewport.itemconfigure(window, width=event.width)
+            for col in range(len(cards)):
+                groups.columnconfigure(col, weight=int(col < columns), uniform="cards" if col < columns else "")
+            for index, card in enumerate(cards.values()):
+                row, col = divmod(index, columns)
+                card.grid(row=row, column=col, sticky="new", padx=(0, 9), pady=(0, 9))
+        viewport.bind("<Configure>", reflow)
+        groups.bind("<Configure>", lambda _: viewport.configure(scrollregion=viewport.bbox("all")))
+
+        def wheel(event):
+            if getattr(event, "num", None) in (4, 5):
+                units = -3 if event.num == 4 else 3
+            else:
+                units = -max(1, abs(event.delta) // 120) * (1 if event.delta > 0 else -1) * 3
+            if self.pages.select() == str(page) and viewport.yview() != (0.0, 1.0):
+                viewport.yview_scroll(units, "units")
+        for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.root.bind(sequence, wheel, add=True)
+
+        def reveal(event):
+            top = event.widget.winfo_rooty() - viewport.winfo_rooty()
+            bottom = top + event.widget.winfo_height() - viewport.winfo_height()
+            delta = min(top, 0) if top < 0 else max(bottom, 0)
+            if delta:
+                viewport.yview_moveto((viewport.canvasy(0) + delta) / max(1, groups.winfo_height()))
+        for check in self.checks:
+            check.bind("<FocusIn>", reveal)
+
+    def build_inventory(self, page):
+        heading = ttk.Frame(page)
+        heading.pack(fill="x")
+        ttk.Label(heading, text="WSL 環境", style="Title.TLabel").pack(side="left")
+        self.button(heading, "更新", self.refresh, side="right")
+        ttk.Label(page, textvariable=self.inventory_count, style="Hint.TLabel").pack(anchor="w", pady=(1, 10))
+        actions = ttk.Frame(page)
         actions.pack(fill="x", pady=(0, 12))
-        choices = ttk.LabelFrame(body, text="インストールする CAE ソフト（複数選択可）", padding=6)
-        choices.pack(before=actions, fill="x", pady=(0, 8))
-        self.software = {}
-        for index, label in enumerate((OPENFOAM_WIZARD, *CAE_PROFILES)):
-            checked = tk.BooleanVar(value=False)
-            self.software[label] = checked
-            ttk.Checkbutton(choices, text=label, variable=checked).grid(
-                row=index // 3, column=index % 3, sticky="w", padx=4)
-        self.button(actions, "CAE 環境を作成", self.create_cae_environment, primary=True)
         self.button(actions, "WSL にディストリビューションを追加", self.install)
         self.button(actions, "インポート", self.import_distro)
-        table = tk.Frame(body)
+
+        commands = ttk.Frame(page)
+        commands.pack(side="bottom", fill="x", pady=(12, 0))
+        for label, handler in (("選択した WSL を起動", self.terminal), ("停止", self.stop),
+                               ("既定に設定", self.set_default), ("エクスポート", self.export),
+                               ("選択した WSL を削除", self.remove)):
+            button = ttk.Button(commands, text=label, command=handler,
+                                style="Primary.TButton" if handler == self.terminal else "TButton")
+            self.buttons.append(button)
+            self.selected_buttons.append(button)
+        def fit_commands(event):
+            row = col = used = 0
+            for button in self.selected_buttons:
+                width = button.winfo_reqwidth() + 6
+                if col and used + width > event.width:
+                    row, col, used = row + 1, 0, 0
+                button.grid(row=row, column=col, padx=(0, 6), pady=2, sticky="w")
+                used += width
+                col += 1
+        commands.bind("<Configure>", fit_commands)
+        for col, button in enumerate(self.selected_buttons):
+            button.grid(row=0, column=col, padx=(0, 6))
+
+        table = tk.Frame(page, bg=theme.WHITE, highlightbackground=theme.LINE, highlightthickness=1)
         table.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(table, columns=("name", "state", "version", "default"),
-                                 show="headings", selectmode="browse")
-        for col, label, width in zip(self.tree["columns"], ("名前", "状態", "バージョン", "既定"), (290, 105, 110, 80)):
+                                 height=3, show="headings", selectmode="browse")
+        for col, label, width in zip(self.tree["columns"], ("登録名", "状態", "バージョン", "既定"),
+                                     (310, 110, 115, 75)):
             self.tree.heading(col, text=label, anchor="w")
             self.tree.column(col, width=width, minwidth=50, anchor="w")
         scroll = ttk.Scrollbar(table, command=self.tree.yview)
         scroll.pack(side="right", fill="y")
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(fill="both", expand=True)
+        self.tree.tag_configure("stripe", background="#f5f8f5")
         self.tree.bind("<<TreeviewSelect>>", lambda _: self.controls())
         self.tree.bind("<Double-1>", self.launch_row)
         self.tree.bind("<Return>", lambda _: self.terminal())
-        commands = tk.Frame(body, bg="#f1f5f9")
-        commands.pack(before=table, fill="x", side="bottom", pady=(12, 0))
-        for label, handler in (("選択した WSL を起動", self.terminal), ("停止", self.stop),
-                               ("既定に設定", self.set_default), ("エクスポート", self.export),
-                               ("選択した WSL を削除", self.remove)):
-            self.selected_buttons.append(self.button(commands, label, handler))
-        self.status = tk.StringVar(value="")
-        tk.Label(root, textvariable=self.status, anchor="w", padx=26, pady=8,
-                 bg="#e3ebeF", fg="#284451").pack(fill="x")
-        root.protocol("WM_DELETE_WINDOW", self.close)
-        root.after(80, self.poll)
-        self.refresh()
 
     def button(self, parent, text, command, primary=False, side="left"):
-        button = tk.Button(parent, text=text, command=command, relief="flat", padx=12, pady=6,
-                           bg="#126b61" if primary else "#ffffff",
-                           fg="white" if primary else "#273a48", font=("Yu Gothic UI", 10))
+        button = ttk.Button(parent, text=text, command=command, style="Primary.TButton" if primary else "TButton")
         button.pack(side=side, padx=(0, 6))
         self.buttons.append(button)
         return button
@@ -386,9 +473,15 @@ class Manager:
         return selected[0] if selected else ""
 
     def controls(self):
+        count = sum(var.get() for var in self.software.values())
+        self.choice_count.set(f"{count} 件選択中")
+        for widget in self.checks:
+            widget.state(["disabled" if self.busy else "!disabled"])
         for button in self.buttons:
             disabled = self.busy or (button in self.selected_buttons and not self.selected())
-            button.configure(state="disabled" if disabled else "normal")
+            if button == self.create_button and count == 0:
+                disabled = True
+            button.state(["disabled" if disabled else "!disabled"])
 
     def run(self, label, work, done):
         if self.busy:
@@ -396,6 +489,8 @@ class Manager:
         self.busy = True
         self.controls()
         self.status.set(label + "中…")
+        self.activity.pack(side="right", padx=(10, 0))
+        self.activity.start(18)
         def worker():
             try:
                 value = work()
@@ -413,6 +508,8 @@ class Manager:
         except queue.Empty:
             pass
         else:
+            self.activity.stop()
+            self.activity.pack_forget()
             self.busy = False
             self.controls()
             if error is not None:
@@ -427,9 +524,13 @@ class Manager:
             selected = self.selected()
             self.tree.delete(*self.tree.get_children())
             self.rows = rows
-            for name, version, primary, running in rows:
+            total = len(rows)
+            running_count = sum(bool(row[3]) for row in rows)
+            self.inventory_count.set(f"登録 {total} 件   /   実行中 {running_count} 件" if total else "登録された WSL 環境はありません。")
+            for index, (name, version, primary, running) in enumerate(rows):
                 self.tree.insert("", "end", iid=name, values=(name, "実行中" if running else "停止中",
-                                                            f"WSL {version}", "既定" if primary else ""))
+                                                            f"WSL {version}", "既定" if primary else "—"),
+                                 tags=("stripe",) if index % 2 else ())
             if selected and self.tree.exists(selected):
                 self.tree.selection_set(selected)
             self.controls()
@@ -490,7 +591,7 @@ class Manager:
             dialog.destroy()
         footer = ttk.Frame(panel)
         footer.pack(fill="x")
-        ttk.Button(footer, text=title, command=accept).pack(side="right")
+        ttk.Button(footer, text=title, command=accept, style="Primary.TButton").pack(side="right")
         ttk.Button(footer, text="キャンセル", command=dialog.destroy).pack(side="right", padx=6)
         dialog.bind("<Return>", accept)
         dialog.bind("<Escape>", lambda _: dialog.destroy())
@@ -586,7 +687,7 @@ class Manager:
 
         cancel = ttk.Button(actions, text="キャンセル", command=dialog.destroy)
         cancel.pack(side="left", padx=6)
-        ttk.Button(actions, text="削除する", command=confirm).pack(side="left")
+        ttk.Button(actions, text="削除する", command=confirm, style="Danger.TButton").pack(side="left")
         dialog.bind("<Escape>", lambda _: dialog.destroy())
         dialog.bind("<Return>", lambda _: dialog.destroy())
         dialog.wait_visibility()
