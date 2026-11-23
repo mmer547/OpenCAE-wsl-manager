@@ -1,5 +1,6 @@
 """Windows Subsystem for Linux のローカル管理画面。"""
 import hashlib
+import http.client
 import os
 import platform
 import urllib.request
@@ -110,10 +111,43 @@ class CaeProfile:
 OPENFOAM_WIZARD = "OpenFOAM（配布元・版を選択）"
 
 
+@dataclass(frozen=True)
+class OpenFoamEdition:
+    repository: str
+    package_pattern: str
+    bundled_version: str
+    prefix: str = ""
+
+
+OPENFOAM_EDITIONS = {
+    "OpenFOAM Foundation": OpenFoamEdition("https://dl.openfoam.org/ubuntu", r"openfoam([1-9][0-9]?)", "14"),
+    "OpenFOAM Keysight": OpenFoamEdition("https://dl.openfoam.com/repos/deb", r"openfoam([0-9]{2}(?:06|12))-default", "2512", "v"),
+}
+
+
+def fetch_openfoam_versions(updates):
+    for label, edition in OPENFOAM_EDITIONS.items():
+        url = edition.repository + "/dists/noble/main/binary-amd64/Packages"
+        request = urllib.request.Request(url, headers={"User-Agent": "OpenCAE-WSL-Manager/1"})
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                index = response.read().decode().replace("\r\n", "\n")
+        except (OSError, http.client.HTTPException, UnicodeError):
+            continue
+        releases = set()
+        for record in index.split("\n\n"):
+            package = re.search("^Package: " + edition.package_pattern + "$", record, re.M)
+            version = re.search(r"^Version: (\S+)$", record, re.M)
+            if package and version and "~" not in version[1]:
+                releases.add(package[1])
+        if releases:
+            updates.put((label, max(releases, key=int)))
+
+
 CAE_PROFILES = {
-    "OpenFOAM Foundation（最新版）": CaeProfile("OpenFOAM-Foundation", "openfoam_foundation_setup.sh", category="流体解析",
+    "OpenFOAM Foundation": CaeProfile("OpenFOAM-Foundation", "openfoam_foundation_setup.sh", category="流体解析",
                                             resources=("openfoam_latest.sh",)),
-    "OpenFOAM Keysight（最新版）": CaeProfile("OpenFOAM-Keysight", "openfoam_keysight_setup.sh", category="流体解析",
+    "OpenFOAM Keysight": CaeProfile("OpenFOAM-Keysight", "openfoam_keysight_setup.sh", category="流体解析",
                                          resources=("openfoam_latest.sh",)),
     "Salome-Meca 2025.1": CaeProfile("Salome-Meca-2025", "salome_meca_setup.sh", category="構造・連成解析", sif_source=True),
     "OpenLB 1.9r0": CaeProfile("OpenLB-1.9r0", "openlb_setup.sh", category="流体解析"),
@@ -213,7 +247,7 @@ def discard_failed_environment(name, stage, error):
     raise RuntimeError(f"「{name}」の{stage}で失敗したため、この環境を削除しました。\n{error}") from error
 
 
-def create_cae(selected, name, folder, progress, user, password, source=""):
+def create_cae(selected, name, folder, progress, user, password, source="", *, openfoam_versions=None):
     if not selected:
         raise ValueError("ソフトを1つ以上選んでください。")
     wizard = OPENFOAM_WIZARD in selected
@@ -226,6 +260,13 @@ def create_cae(selected, name, folder, progress, user, password, source=""):
     resources = {filename for profile in profiles for filename in profile.resources}
     scripts = {filename: (script_dir / filename).read_text(encoding="utf-8").encode()
                for filename in (*steps, *resources, "resume.sh")}
+    for label in selected:
+        if label in OPENFOAM_EDITIONS:
+            edition = OPENFOAM_EDITIONS[label]
+            version = (openfoam_versions or {}).get(label, edition.bundled_version)
+            script = CAE_PROFILES[label].setup_script
+            scripts[script.replace("_setup.sh", ".version")] = (version + "\n").encode("ascii")
+            steps[script] = f"{label} {edition.prefix}{version}"
     image = salome_image.prepare_image(source, progress) if any(p.sif_source for p in profiles) else None
     if wizard:
         progress("OpenFOAM の配布元と版をコンソールで選択してください")
@@ -314,6 +355,9 @@ class Manager:
         self.rows = []
         self.buttons = []
         self.selected_buttons = []
+        self.release_updates = queue.SimpleQueue()
+        self.available_versions = {label: e.bundled_version for label, e in OPENFOAM_EDITIONS.items()}
+        self.displayed_versions = self.available_versions.copy()
         self.software = {label: tk.BooleanVar(root) for label in (OPENFOAM_WIZARD, *CAE_PROFILES)}
         self.status = tk.StringVar(root)
         self.choice_count = tk.StringVar(root)
@@ -345,6 +389,12 @@ class Manager:
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(80, self.poll)
         self.refresh()
+        threading.Thread(target=fetch_openfoam_versions, args=(self.release_updates,), daemon=True).start()
+
+    def software_label(self, label):
+        if label in OPENFOAM_EDITIONS:
+            return f"{label} {OPENFOAM_EDITIONS[label].prefix}{self.displayed_versions[label]}"
+        return label
 
     def build_catalog(self, page):
         ttk.Label(page, text="ソフトウェアを選択", style="Title.TLabel").pack(anchor="w")
@@ -375,7 +425,7 @@ class Manager:
                 tk.Label(bar, text=category, bg=theme.WHITE, fg=theme.INK,
                          font=(self.family, 12, "bold")).pack(side="left")
                 ttk.Separator(card).pack(fill="x")
-            check = ttk.Checkbutton(cards[category], text=label, variable=variable,
+            check = ttk.Checkbutton(cards[category], text=self.software_label(label), variable=variable,
                                     style="Catalog.TCheckbutton", command=self.controls)
             check.pack(anchor="w", fill="x", padx=4, pady=1)
             self.checks.append(check)
@@ -475,7 +525,10 @@ class Manager:
     def controls(self):
         count = sum(var.get() for var in self.software.values())
         self.choice_count.set(f"{count} 件選択中")
-        for widget in self.checks:
+        for label, widget in zip(self.software, self.checks):
+            if label in self.available_versions and not self.software[label].get():
+                self.displayed_versions[label] = self.available_versions[label]
+                widget.configure(text=self.software_label(label))
             widget.state(["disabled" if self.busy else "!disabled"])
         for button in self.buttons:
             disabled = self.busy or (button in self.selected_buttons and not self.selected())
@@ -501,6 +554,10 @@ class Manager:
         threading.Thread(target=worker, daemon=True).start()
 
     def poll(self):
+        while not self.release_updates.empty():
+            label, version = self.release_updates.get()
+            self.available_versions[label] = version
+            self.controls()
         while not self.progress.empty():
             self.status.set(self.progress.get())
         try:
@@ -602,6 +659,7 @@ class Manager:
         if not selected:
             messagebox.showinfo("CAE 環境を作成", "ソフトを1つ以上選んでください。", parent=self.root)
             return
+        versions = self.displayed_versions.copy()
         wizard = OPENFOAM_WIZARD in selected
         fields = []
         if not wizard:
@@ -620,9 +678,9 @@ class Manager:
             validate_account(user, password, confirmation)
             self.run("CAE 環境の作成",
                      lambda: create_cae(selected, name, folder, self.progress.put, user, password,
-                                        source[0] if source else ""), self.refresh)
+                                        source[0] if source else "", openfoam_versions=versions), self.refresh)
 
-        prompt = "同じ WSL 環境に導入します。 " + "、".join(selected)
+        prompt = "同じ WSL 環境に導入します。 " + "、".join(self.software_label(label) for label in selected)
         if wizard:
             prompt += "。続くコンソールで OpenFOAM の配布元と版を選択します。"
         self.form("CAE 環境を作成", fields, submit, prompt)

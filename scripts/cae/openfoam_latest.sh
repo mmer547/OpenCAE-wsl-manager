@@ -35,11 +35,17 @@ apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
 index=$(apt-get -o Dir::Etc::sourcelist="$source_file" -o Dir::Etc::sourceparts=- \
     indextargets --format '$(FILENAME)' 'Identifier: Packages' 'Architecture: amd64')
 test -f "$index"
-version=$(/usr/lib/apt/apt-helper cat-file "$index" |
+releases=$(/usr/lib/apt/apt-helper cat-file "$index" |
     awk -v RS='' '!/(^|\n)Version: [^\n]*~/' |
-    sed -nE "s/^Package: $pattern/\\1/p" | sort -nu | tail -1)
-if [[ -z "$version" ]]; then
-    echo "$repo: Ubuntu 24.04 用の正式リリースが見つかりません。" >&2
+    sed -nE "s/^Package: $pattern/\\1/p" | sort -nu)
+selection="/root/openfoam_$1.version"
+if [[ -f "$selection" ]]; then
+    IFS= read -r version < "$selection"
+else
+    version=$(tail -1 <<< "$releases")
+fi
+if [[ -z "$version" ]] || ! grep -Fxq -- "$version" <<< "$releases"; then
+    echo "$repo: 指定した正式版 ($version) が Ubuntu 24.04 のパッケージ一覧にありません。" >&2
     exit 1
 fi
 apt-get install -y "openfoam${version}${suffix}"

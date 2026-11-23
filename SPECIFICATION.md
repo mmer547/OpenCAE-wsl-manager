@@ -37,7 +37,7 @@ CAE 作成と tar インポートで保存先が空欄の場合は、現行 WSL 
 
 対象は x64 の WSL 2。入力は未使用の登録名、任意の保存先、Linux ユーザー名、パスワードとその確認。作成処理は Ubuntu Base 24.04.5 amd64 の tar.gz を一時ディレクトリに取得し、配布元掲載値と SHA-256 が一致した場合に `wsl --import ... --version 2` を実行する。[Ubuntu Base 配布元](https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/)
 
-Foundation と Keysight の最新版を別々のチェック項目として提供する。各配布元の署名を検証した Ubuntu noble の amd64 パッケージ一覧から正式版の最大番号を求め、Foundation は openfoam〈番号〉、Keysight は openfoam〈年月〉-default を導入する。選択したユーザーで版番号と blockMesh を確認する。TreeFOAM 用の Foundation 12 は固定する。
+起動時に各配布元の Ubuntu noble amd64 パッケージ一覧から正式版の最大番号を取得し、チェック欄に Foundation は番号、Keysight は v 付きの年月を表示する。取得前と通信失敗時には同梱の確認済み番号を使う。チェックした版番号を作成画面に引き継ぎ、署名検証済みの APT 一覧にその版があることを確認して導入する。選択したユーザーで版番号と blockMesh を確認する。TreeFOAM 用の Foundation 12 は固定する。
 
 Windows 上での新規作成からソルバー起動までの通し試験は未実施。
 
