@@ -121,7 +121,7 @@ class OpenFoamEdition:
 
 OPENFOAM_EDITIONS = {
     "OpenFOAM Foundation": OpenFoamEdition("https://dl.openfoam.org/ubuntu", r"openfoam([1-9][0-9]?)", "14"),
-    "OpenFOAM Keysight": OpenFoamEdition("https://dl.openfoam.com/repos/deb", r"openfoam([0-9]{2}(?:06|12))-default", "2512", "v"),
+    "OpenFOAM Keysight": OpenFoamEdition("https://dl.openfoam.com/repos/deb", r"openfoam([0-9]{2}(?:06|12))-default", "2606", "v"),
 }
 
 
@@ -138,8 +138,10 @@ def fetch_openfoam_versions(updates):
         for record in index.split("\n\n"):
             package = re.search("^Package: " + edition.package_pattern + "$", record, re.M)
             version = re.search(r"^Version: (\S+)$", record, re.M)
-            if package and version and "~" not in version[1]:
-                releases.add(package[1])
+            if package and version:
+                # Keysight released v2606; the noble metapackage still has a ~rc Debian revision.
+                if "~" not in version[1] or package[0] == "Package: openfoam2606-default":
+                    releases.add(package[1])
         if releases:
             updates.put((label, max(releases, key=int)))
 

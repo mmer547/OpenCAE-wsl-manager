@@ -3,52 +3,51 @@
 set -eo pipefail
 export DEBIAN_FRONTEND=noninteractive
 cd /
-case "$1" in
-    foundation)
-        repo=https://dl.openfoam.org/ubuntu
-        key=https://dl.openfoam.org/gpg.key
-        pattern='openfoam([1-9][0-9]?)$'
-        suffix=''
-        base=/opt
-        ;;
-    keysight)
-        repo=https://dl.openfoam.com/repos/deb
-        key=https://dl.openfoam.com/pubkey.gpg
-        pattern='openfoam([0-9]{2}(06|12))-default$'
-        suffix=-default
-        base=/usr/lib/openfoam
-        ;;
-    *) exit 2 ;;
-esac
-source_file=/etc/apt/sources.list.d/openfoam-"$1".list
-keyring=/etc/apt/keyrings/openfoam-"$1".asc
+case "$1" in foundation|keysight) ;; *) exit 2 ;; esac
+selection="/root/openfoam_$1.version"
 apt-get -o APT::Update::Error-Mode=any update
 apt-get install -y --no-install-recommends curl ca-certificates
 stage=$(mktemp)
 trap 'rm -f "$stage"' EXIT
-curl -fsSL --retry 3 "$key" -o "$stage"
-install -Dm644 "$stage" "$keyring"
-printf 'deb [arch=amd64 signed-by=%s] %s noble main\n' "$keyring" "$repo" > "$source_file"
-apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
-
-# Read the authenticated Packages index retained by APT for this source.
-index=$(apt-get -o Dir::Etc::sourcelist="$source_file" -o Dir::Etc::sourceparts=- \
-    indextargets --format '$(FILENAME)' 'Identifier: Packages' 'Architecture: amd64')
-test -f "$index"
-releases=$(/usr/lib/apt/apt-helper cat-file "$index" |
-    awk -v RS='' '!/(^|\n)Version: [^\n]*~/' |
-    sed -nE "s/^Package: $pattern/\\1/p" | sort -nu)
-selection="/root/openfoam_$1.version"
-if [[ -f "$selection" ]]; then
-    IFS= read -r version < "$selection"
-else
-    version=$(tail -1 <<< "$releases")
-fi
-if [[ -z "$version" ]] || ! grep -Fxq -- "$version" <<< "$releases"; then
-    echo "$repo: 指定した正式版 ($version) が Ubuntu 24.04 のパッケージ一覧にありません。" >&2
-    exit 1
-fi
-apt-get install -y "openfoam${version}${suffix}"
+case "$1" in
+    keysight)
+        # The upstream repository script configures the key and source for this Ubuntu release.
+        curl -fsSL --retry 3 https://dl.openfoam.com/add-debian-repo.sh -o "$stage"
+        bash "$stage"
+        apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
+        version=2606
+        if [[ -f "$selection" ]]; then IFS= read -r version < "$selection"; fi
+        [[ "$version" =~ ^[0-9]{2}(06|12)$ ]] || { echo "Keysight の版番号が不正です: $version" >&2; exit 1; }
+        package="openfoam${version}-default"
+        base=/usr/lib/openfoam
+        ;;
+    foundation)
+        source_file=/etc/apt/sources.list.d/openfoam-foundation.list
+        keyring=/etc/apt/keyrings/openfoam-foundation.asc
+        curl -fsSL --retry 3 https://dl.openfoam.org/gpg.key -o "$stage"
+        install -Dm644 "$stage" "$keyring"
+        printf 'deb [arch=amd64 signed-by=%s] https://dl.openfoam.org/ubuntu noble main\n' "$keyring" > "$source_file"
+        apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
+        index=$(apt-get -o Dir::Etc::sourcelist="$source_file" -o Dir::Etc::sourceparts=- \
+            indextargets --format '$(FILENAME)' 'Identifier: Packages' 'Architecture: amd64')
+        test -f "$index"
+        releases=$(/usr/lib/apt/apt-helper cat-file "$index" |
+            awk -v RS='' '!/(^|\n)Version: [^\n]*~/' |
+            sed -nE 's/^Package: openfoam([1-9][0-9]?)$/\1/p' | sort -nu)
+        if [[ -f "$selection" ]]; then
+            IFS= read -r version < "$selection"
+        else
+            version=$(tail -1 <<< "$releases")
+        fi
+        if [[ -z "$version" ]] || ! grep -Fxq -- "$version" <<< "$releases"; then
+            echo "Foundation の正式版 ($version) が Ubuntu 24.04 のパッケージ一覧にありません。" >&2
+            exit 1
+        fi
+        package="openfoam${version}"
+        base=/opt
+        ;;
+esac
+apt-get install -y "$package"
 envfile="$base/openfoam$version/etc/bashrc"
 IFS= read -r linux_user < /root/wsl-manager-user
 user_home=$(getent passwd "$linux_user" | cut -d: -f6)

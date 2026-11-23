@@ -38,7 +38,7 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 | ソフト | 標準の登録名 | 再開に使うスクリプト |
 | --- | --- | --- |
 | OpenFOAM Foundation 14 | `OpenFOAM-Foundation` | `openfoam_foundation_setup.sh` |
-| OpenFOAM Keysight v2512 | `OpenFOAM-Keysight` | `openfoam_keysight_setup.sh` |
+| OpenFOAM Keysight v2606 | `OpenFOAM-Keysight` | `openfoam_keysight_setup.sh` |
 | OpenLB 1.9r0 | `OpenLB-1.9r0` | `openlb_setup.sh` |
 | Salome-Meca 2025.1 | `Salome-Meca-2025` | `salome_meca_setup.sh` |
 | CalculiX | `CalculiX` | `calculix_setup.sh` |
@@ -59,11 +59,13 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 **OpenFOAM（配布元・版を選択） → CAE 環境を作成** を選びます。
 
 1. GUI で Linux ユーザー名とパスワードを入力して作成を開始すると、専用コンソールが開きます。
-2. Foundation または Keysight（OpenCFD）を選びます。配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で一覧中の最新の正式版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
+2. Foundation または Keysight（OpenCFD）を選びます。配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で表示された既定の版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
 3. 続行すると Ubuntu 24.04 LTS の WSL 2 を作成します。登録名が重複すると `-2`、`-3` と自動採番されます。設定したユーザーで sudo を使えます。
 4. OpenFOAM の検証が完了すると、マネージャーが同じ登録名の環境に残りのソフトを自動で導入します。
 
-保存場所は WSL が管理します。チェック欄には、起動時に確認した正式版の番号を表示します（例 **OpenFOAM Foundation 14**、**OpenFOAM Keysight v2512**）。公式一覧を取得できない場合は同梱の版番号を表示します。選択した番号の版をインストールします。両方を選ぶと同じ環境に導入し、通常のターミナルでは先に設定した版を読み込みます。[対話インストーラーの詳細](openfoam-installer/README.md)
+保存場所は WSL が管理します。チェック欄には、起動時に確認した版番号を表示します（例 **OpenFOAM Foundation 14**、**OpenFOAM Keysight v2606**）。公式一覧を取得できない場合は同梱の版番号を表示します。選択した番号の版をインストールします。両方を選ぶと同じ環境に導入し、通常のターミナルでは先に設定した版を読み込みます。[対話インストーラーの詳細](openfoam-installer/README.md)
+
+Keysight v2606 は、公式リポジトリ登録スクリプト `add-debian-repo.sh` を実行してから、APT で `openfoam2606-default` を導入します。実際のリビジョンは WSL 内で `apt-cache policy openfoam2606-default` を実行すると確認できます。[公式の Ubuntu 向け手順](https://gitlab.com/openfoam/core/openfoam/-/wikis/precompiled/debian)
 
 ### Salome-Meca の取得と起動
 

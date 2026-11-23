@@ -221,7 +221,9 @@ function Select-OpenFoamVersion {
             $reader.Dispose()
         }
         $pattern = "(?m)^Package: openfoam($VersionPattern)$PackageSuffix\r?$"
-        $releaseRecords = $index -split '\r?\n\r?\n' | Where-Object { $_ -notmatch '(?m)^Version: [^\r\n]*~' }
+        $releaseRecords = $index -split '\r?\n\r?\n' | Where-Object {
+            $_ -notmatch '(?m)^Version: [^\r\n]*~' -or $_ -match '(?m)^Package: openfoam2606-default\r?$'
+        }
         $latest = [regex]::Matches(($releaseRecords -join "`n"), $pattern) |
             ForEach-Object { $_.Groups[1].Value } | Sort-Object { [int]$_ } -Descending | Select-Object -First 1
         $available = @([regex]::Matches($index, $pattern) |
@@ -234,7 +236,7 @@ function Select-OpenFoamVersion {
     $prompt = 'バージョン'
     if ($available.Count -gt 0) {
         Write-Host "Ubuntu 24.04 で選択できる版: $($available -join ', ')"
-        if ($latest) { $prompt = "バージョン [最新の正式版 $latest]" }
+        if ($latest) { $prompt = "バージョン [$latest]" }
     }
     while ($true) {
         $version = (Read-Host $prompt).Trim()
@@ -397,10 +399,11 @@ apt-get update
         Invoke-Wsl $distributionName @'
 set -e
 add-apt-repository -y universe
-install -d -m 0755 /etc/apt/keyrings
-wget -qO /etc/apt/keyrings/openfoam-keysight.asc https://dl.openfoam.com/pubkey.gpg
-echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/openfoam-keysight.asc] https://dl.openfoam.com/repos/deb noble main' > /etc/apt/sources.list.d/openfoam-keysight.list
-apt-get update
+stage=$(mktemp)
+trap 'rm -f "$stage"' EXIT
+wget -q -O "$stage" https://dl.openfoam.com/add-debian-repo.sh
+DEBIAN_FRONTEND=noninteractive bash "$stage"
+apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
 '@
     }
 

@@ -37,7 +37,7 @@ CAE 作成と tar インポートで保存先が空欄の場合は、現行 WSL 
 
 対象は x64 の WSL 2。入力は未使用の登録名、任意の保存先、Linux ユーザー名、パスワードとその確認。作成処理は Ubuntu Base 24.04.5 amd64 の tar.gz を一時ディレクトリに取得し、配布元掲載値と SHA-256 が一致した場合に `wsl --import ... --version 2` を実行する。[Ubuntu Base 配布元](https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/)
 
-起動時に各配布元の Ubuntu noble amd64 パッケージ一覧から正式版の最大番号を取得し、チェック欄に Foundation は番号、Keysight は v 付きの年月を表示する。取得前と通信失敗時には同梱の確認済み番号を使う。チェックした版番号を作成画面に引き継ぎ、署名検証済みの APT 一覧にその版があることを確認して導入する。選択したユーザーで版番号と blockMesh を確認する。TreeFOAM 用の Foundation 12 は固定する。
+起動時に各配布元の Ubuntu noble amd64 パッケージ一覧から導入対象の版番号を取得し、チェック欄に Foundation は番号、Keysight は v 付きの年月を表示する。取得前と通信失敗時には同梱の確認済み番号を使う。チェックした版番号を作成画面に引き継ぎ、署名検証済みの APT 一覧にその版があることを確認して導入する。選択したユーザーで版番号と blockMesh を確認する。TreeFOAM 用の Foundation 12 は固定する。Keysight v2606 は公式の `add-debian-repo.sh` でリポジトリを登録し、`apt-get update` の後に `apt-get install -y openfoam2606-default` を実行する。APT が選ぶパッケージのリビジョンに `~rc` が含まれる場合も同じパッケージ名で導入する。
 
 Windows 上での新規作成からソルバー起動までの通し試験は未実施。
 
@@ -63,7 +63,7 @@ WSL 内に Apptainer を導入し、GUI で指定したユーザーのホーム�
 
 ## OpenFOAM の対話インストーラー
 
-配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で一覧中の最新の正式版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
+配布元を選ぶと Ubuntu 24.04（amd64）向けの公式パッケージ一覧を取得します。Enter で表示された既定の版、番号入力で指定版をインストールします。一覧を取得できない場合は番号を手入力できます。
 
 「OpenFOAM（配布元・版を選択）」は、同梱した BAT と PowerShell スクリプトを独立した Windows コンソールで実行する。参照元の main のコミット e46c67c を使用した。[参照した実装](https://github.com/mmer547/OpenFOAM_bat_installer/tree/e46c67cc63a2c21c906d6777ccd81bcfa01932f4)
 
