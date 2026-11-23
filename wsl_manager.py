@@ -157,6 +157,7 @@ CAE_PROFILES = {
     "OpenCourant": CaeProfile("OpenCourant", "opencourant_setup.sh", category="構造・連成解析"),
     "OpenModelica": CaeProfile("OpenModelica", "openmodelica_setup.sh", category="構造・連成解析"),
     "FreeCAD": CaeProfile("FreeCAD", "freecad_setup.sh", category="CAD・メッシュ・可視化"),
+    "cfMesh": CaeProfile("cfMesh", "cfmesh_setup.sh", category="CAD・メッシュ・可視化"),
     "TreeFOAM": CaeProfile("TreeFOAM", "treefoam_setup.sh", category="流体解析", supporting_scripts=("openfoam_setup.sh",)),
     "Netgen": CaeProfile("Netgen", "netgen_setup.sh", category="CAD・メッシュ・可視化"),
     "Gmsh": CaeProfile("Gmsh", "gmsh_setup.sh", category="CAD・メッシュ・可視化"),
@@ -261,6 +262,8 @@ def create_cae(selected, name, folder, progress, user, password, source="", *, o
         raise ValueError("ソフトを1つ以上選んでください。")
     wizard = OPENFOAM_WIZARD in selected
     profiles = [CAE_PROFILES[label] for label in selected if label != OPENFOAM_WIZARD]
+    # cfMesh selects its build targets from the OpenFOAM releases actually installed in WSL.
+    profiles.sort(key=lambda profile: profile.setup_script == "cfmesh_setup.sh")
     script_dir = Path(__file__).resolve().parent / "scripts" / "cae"
     steps = {}
     for profile in profiles:

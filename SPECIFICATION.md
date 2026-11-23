@@ -81,6 +81,18 @@ Ubuntu 24.04 amd64 の Base イメージのパッケージ状態と各配布元�
 
 Ubuntu 24.04 の `netgen` と `python3-netgen` を導入する。GUI コマンドの存在を確認し、作成画面で指定した Linux ユーザーで単位立方体の三次元メッシュを生成する。体積要素があることを完了条件とする。メッシュ生成の確認はディスプレイを必要とせず、GUI の起動には WSLg を使用する。
 
+## cfMesh
+
+cfMesh を選択した場合、`cfmesh_setup.sh` は同じ WSL に導入済みの Keysight 版を `/usr/lib/openfoam/openfoam<版番号>/etc/bashrc` から検出する。チェック欄と対話インストーラーの両方が対象。v2406 以降が複数あれば、それぞれの版で以下を実行する。
+
+1. OpenFOAM 公式のリリースタグ `OpenFOAM-v<版番号>` が参照する `plugins/cfmesh` のコミットを取得する。
+2. 作成時に指定した一般ユーザーで対象版の環境を読み込み、`WM_PROJECT_VERSION` を確認する。その版の `$WM_PROJECT_USER_DIR/modules/integration-cfmesh` にソースを取得し、対応コミットをチェックアウトする。[OpenFOAM Community の cfMesh](https://gitlab.com/openfoam/community/cfmesh)
+3. `./Allwmake` を最大 2 ジョブで実行する。ユーザー領域のライブラリ、`cartesianMesh` の解決先、`cartesianMesh -help` の成功を完了条件とする。ビルドログはソース内の `log.Allwmake` に保存する。
+
+対象版がない場合は公式バイナリ cfMesh 1.2.0 の SHA-256 を照合し、`/opt/cfMesh-1.2.0` に展開する。一般ユーザーでヘルプが起動することを確認し、そのユーザーの Bash の検索パス末尾に `bin` を追加する。
+
+Linux 上で Ubuntu 24.04 向けの公式パッケージを使い、v2406 と v2606 でソースビルドを確認した。両ビルドと単独版 1.2.0 のそれぞれで立方体の 216 セルのメッシュを生成し、`checkMesh` の `Mesh OK` を確認した。Windows 実機での WSL 新規作成を含む通し試験は未実施。
+
 ## OpenCourant
 
 公式リリース `latest-20261011` の Linux x86-64 ZIP の SHA-256 を照合し、`/opt/opencourant-20261011` に配置する。倍精度 OpenMP 版の Starter と Engine を PATH に登録し、各コマンドの起動時に設定ファイルと共有ライブラリの場所を指定する。GUI で選んだ一般ユーザーで両方の `-version` が成功したら導入完了とする。[公式リリース](https://github.com/OpenCourant/OpenCourant/releases/tag/latest-20261011)

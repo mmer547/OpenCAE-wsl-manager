@@ -45,6 +45,7 @@ x64 版 Windows、WSL 2、インターネット接続、環境用の空き容量
 | OpenCourant | `OpenCourant` | `opencourant_setup.sh` |
 | OpenModelica | `OpenModelica` | `openmodelica_setup.sh` |
 | FreeCAD | `FreeCAD` | `freecad_setup.sh` |
+| cfMesh | `cfMesh` | `cfmesh_setup.sh` |
 | TreeFOAM | `TreeFOAM` | `treefoam_setup.sh` |
 | Netgen | `Netgen` | `netgen_setup.sh` |
 | Gmsh | `Gmsh` | `gmsh_setup.sh` |
@@ -97,6 +98,19 @@ blockMesh -help
 ```
 
 両方を導入した場合、Keysight 版の設定ファイルは `/usr/lib/openfoam/openfoam<版番号>/etc/bashrc`、Foundation 版は `/opt/openfoam<版番号>/etc/bashrc` です。
+
+### cfMesh でメッシュを作る
+
+**CAD・メッシュ・可視化 → cfMesh** にチェックを入れて環境を作成します。OpenFOAM Keysight（OpenCFD）v2406 以降も選んだ場合は、その版の環境を読み込み、一般ユーザーの `$WM_PROJECT_USER_DIR/modules/integration-cfmesh` でソースをビルドします。対話インストーラーから版を選んだ場合も同じです。[参考記事](https://hammamania.tech/openfoam/openfoam2406%E4%BB%A5%E9%99%8D%E3%81%AEcfmesh%E3%81%A4%E3%81%84%E3%81%A6)
+
+作成後に WSL を起動し、次のように確認できます。Foundation と併用する場合は、先に使いたい Keysight 版のシェルを開きます（例 `openfoam2606`）。
+
+```bash
+command -v cartesianMesh
+cartesianMesh -help
+```
+
+Keysight v2406 以降を含まない構成（cfMesh 単独、Foundation のみと併用する場合など）には、公式の単独版 cfMesh 1.2.0 を導入します。単独版の実行ファイルは `/opt/cfMesh-1.2.0/bin/cartesianMesh` です。形状ファイルと `system/meshDict` を用意したケースのディレクトリで実行します。[単独版の配布元](https://sourceforge.net/projects/cfmesh/files/1.2.0/)
 
 ### 作成したユーザーで sudo を使う
 
