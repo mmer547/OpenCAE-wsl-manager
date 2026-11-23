@@ -184,6 +184,12 @@ def validate_account(user, password, confirmation):
         raise ValueError("確認用パスワードが一致しません。")
 
 
+def configure_sudo(root, user, *, if_debian=False):
+    script = Path(__file__).resolve().parent / "scripts" / "cae" / "configure_sudo.sh"
+    options = ("--if-debian",) if if_debian else ()
+    wsl(*root, "/bin/sh", "-s", "--", user, *options, input_data=script.read_text(encoding="utf-8").encode())
+
+
 def create_linux_account(root, user, password, *, ubuntu_base=False):
     # useradd must succeed before setting a password. Never take over an existing account.
     if ubuntu_base:
@@ -197,6 +203,7 @@ def create_linux_account(root, user, password, *, ubuntu_base=False):
         wsl(*root, *command, input_data=f"{user}:{password}\n".encode("utf-8"))
     except RuntimeError:
         raise RuntimeError(f"「{user}」のパスワードを設定できませんでした。") from None
+    configure_sudo(root, user, if_debian=not ubuntu_base)
 
 
 def validate_install_folder(folder):

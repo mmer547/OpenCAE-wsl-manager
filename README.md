@@ -96,6 +96,16 @@ blockMesh -help
 
 両方を導入した場合、Keysight 版の設定ファイルは `/usr/lib/openfoam/openfoam<版番号>/etc/bashrc`、Foundation 版は `/opt/openfoam<版番号>/etc/bashrc` です。
 
+### 作成したユーザーで sudo を使う
+
+CAE 環境では、作成時に設定した Linux パスワードで `sudo` を使えます。旧版で作った環境で `sudo: command not found` や `is not in the sudoers file` と表示される場合は、更新版 ZIP を展開し、そのフォルダーの PowerShell で次を実行します。
+
+```powershell
+py -3 repair_cae.py OpenFOAM-Keysight --sudo-only
+```
+
+`OpenFOAM-Keysight` は一覧にある登録名に置き換えてください。修復はその環境に記録された作成ユーザーを対象とし、パスワードと解析データを保持します。通常追加した Ubuntu / Debian 環境では `py -3 repair_cae.py --sudo-only Ubuntu ユーザー名` と指定できます。完了後は WSL のターミナルを開き直し、`sudo whoami` が `root` を返すことを確認してください。
+
 ### 途中で失敗した場合
 
 新規環境の登録後に初期設定やソフトの導入が失敗すると、マネージャーはその環境を自動削除します。エラーの原因を確認し、同じ登録名で作成し直せます。自動削除にも失敗した場合は、一覧を更新して対象を確認してください。
